@@ -282,52 +282,109 @@ fn handle_response(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
 }
 
 fn handle_sidebar(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
-    let items = app.sidebar_items();
-    let item_count = items.len();
+    // History search mode
+    if app.history_search_active {
+        match key.code {
+            KeyCode::Char(c) => {
+                app.history_search_buf.push(c);
+                app.history_selected = 0;
+            }
+            KeyCode::Backspace => {
+                app.history_search_buf.pop();
+                app.history_selected = 0;
+            }
+            KeyCode::Esc => {
+                app.history_search_active = false;
+                app.history_search_buf.clear();
+            }
+            KeyCode::Enter => {
+                app.history_search_active = false;
+            }
+            _ => {}
+        }
+        return true;
+    }
 
     match key.code {
         KeyCode::Char('q') => return false,
         KeyCode::Tab => app.focus = FocusedPane::UrlBar,
+        // Switch between collections and history sections
+        KeyCode::Char('1') => {
+            app.sidebar_section = 0;
+        }
+        KeyCode::Char('2') => {
+            app.sidebar_section = 1;
+        }
+        KeyCode::BackTab => {
+            app.sidebar_section = if app.sidebar_section == 0 { 1 } else { 0 };
+        }
+        KeyCode::Char('/') => {
+            // Activate history search
+            app.sidebar_section = 1;
+            app.history_search_active = true;
+            app.history_search_buf.clear();
+        }
         KeyCode::Char('j') | KeyCode::Down => {
-            if item_count > 0 {
-                app.sidebar_selected = (app.sidebar_selected + 1).min(item_count - 1);
-            }
-        }
-        KeyCode::Char('k') | KeyCode::Up => {
-            app.sidebar_selected = app.sidebar_selected.saturating_sub(1);
-        }
-        KeyCode::Enter | KeyCode::Char('l') => {
-            if let Some(item) = items.get(app.sidebar_selected) {
-                match item {
-                    SidebarItem::Collection { index, .. } => {
-                        let idx = *index;
-                        if idx < app.sidebar_expanded.len() {
-                            app.sidebar_expanded[idx] = !app.sidebar_expanded[idx];
-                        }
-                    }
-                    SidebarItem::Request { collection_index, request_id, .. } => {
-                        let ci = *collection_index;
-                        let rid = *request_id;
-                        app.load_request(ci, rid);
-                        app.focus = FocusedPane::UrlBar;
-                    }
+            if app.sidebar_section == 0 {
+                let items = app.sidebar_items();
+                if !items.is_empty() {
+                    app.sidebar_selected = (app.sidebar_selected + 1).min(items.len() - 1);
+                }
+            } else {
+                let filtered = app.filtered_history();
+                if !filtered.is_empty() {
+                    app.history_selected = (app.history_selected + 1).min(filtered.len() - 1);
                 }
             }
         }
-        KeyCode::Char('h') => {
-            // Collapse current collection
-            if let Some(item) = items.get(app.sidebar_selected) {
-                match item {
-                    SidebarItem::Collection { index, .. } => {
-                        let idx = *index;
-                        if idx < app.sidebar_expanded.len() {
-                            app.sidebar_expanded[idx] = false;
+        KeyCode::Char('k') | KeyCode::Up => {
+            if app.sidebar_section == 0 {
+                app.sidebar_selected = app.sidebar_selected.saturating_sub(1);
+            } else {
+                app.history_selected = app.history_selected.saturating_sub(1);
+            }
+        }
+        KeyCode::Enter | KeyCode::Char('l') => {
+            if app.sidebar_section == 0 {
+                let items = app.sidebar_items();
+                if let Some(item) = items.get(app.sidebar_selected) {
+                    match item {
+                        SidebarItem::Collection { index, .. } => {
+                            let idx = *index;
+                            if idx < app.sidebar_expanded.len() {
+                                app.sidebar_expanded[idx] = !app.sidebar_expanded[idx];
+                            }
+                        }
+                        SidebarItem::Request { collection_index, request_id, .. } => {
+                            let ci = *collection_index;
+                            let rid = *request_id;
+                            app.load_request(ci, rid);
+                            app.focus = FocusedPane::UrlBar;
                         }
                     }
-                    SidebarItem::Request { collection_index, .. } => {
-                        let ci = *collection_index;
-                        if ci < app.sidebar_expanded.len() {
-                            app.sidebar_expanded[ci] = false;
+                }
+            } else {
+                let idx = app.history_selected;
+                app.load_history_entry(idx);
+                app.focus = FocusedPane::UrlBar;
+            }
+        }
+        KeyCode::Char('h') => {
+            if app.sidebar_section == 0 {
+                let items = app.sidebar_items();
+                if let Some(item) = items.get(app.sidebar_selected) {
+                    match item {
+                        SidebarItem::Collection { index, .. } => {
+                            let idx = *index;
+                            if idx < app.sidebar_expanded.len() {
+                                app.sidebar_expanded[idx] = false;
+                            }
+                        }
+                        SidebarItem::Request { collection_index, .. } => {
+                            let ci = *collection_index;
+                            if ci < app.sidebar_expanded.len() {
+                                app.sidebar_expanded[ci] = false;
+                            }
                         }
                     }
                 }

@@ -92,7 +92,7 @@ pub fn render(frame: &mut Frame, app: &App) {
 
 fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     let is_focused = app.focus == FocusedPane::Sidebar;
-    let border_color = if is_focused { ACCENT_BLUE } else { BORDER };
+    let border_color = if is_focused && app.sidebar_section == 0 { ACCENT_BLUE } else { BORDER };
 
     // Split sidebar: collections top, history bottom
     let chunks = Layout::default()
@@ -162,33 +162,56 @@ fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     // History
+    let hist_focused = is_focused && app.sidebar_section == 1;
+    let hist_border = if hist_focused { ACCENT_BLUE } else { BORDER };
+
+    let hist_title = if app.history_search_active {
+        format!(" History [/{}] ", app.history_search_buf)
+    } else if !app.history_search_buf.is_empty() {
+        format!(" History (filter: {}) ", app.history_search_buf)
+    } else {
+        " History ".to_string()
+    };
+
     let hist_block = Block::default()
-        .title(" History ")
+        .title(hist_title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(BORDER))
+        .border_style(Style::default().fg(hist_border))
         .style(Style::default().bg(BG_SURFACE));
 
-    if app.history.is_empty() {
-        let empty = Paragraph::new("  No history")
+    let filtered = app.filtered_history();
+    if filtered.is_empty() {
+        let msg = if app.history_search_buf.is_empty() {
+            "  No history"
+        } else {
+            "  No matching history"
+        };
+        let empty = Paragraph::new(msg)
             .style(Style::default().fg(TEXT_SECONDARY))
             .block(hist_block);
         frame.render_widget(empty, chunks[1]);
     } else {
-        let items: Vec<ListItem> = app
-            .history
+        let items: Vec<ListItem> = filtered
             .iter()
             .take(20)
-            .map(|h| {
+            .enumerate()
+            .map(|(i, h)| {
+                let is_selected = hist_focused && i == app.history_selected;
                 let method_style = method_color_str(&h.method);
                 let status_str = h
                     .status
                     .map(|s| format!("{s}"))
                     .unwrap_or_else(|| "ERR".to_string());
+                let url_style = if is_selected {
+                    Style::default().fg(TEXT_PRIMARY).add_modifier(Modifier::REVERSED)
+                } else {
+                    Style::default().fg(TEXT_PRIMARY)
+                };
                 ListItem::new(Line::from(vec![
                     Span::styled(format!(" {:>4} ", h.method), method_style),
                     Span::styled(
                         truncate_url(&h.url, 18),
-                        Style::default().fg(TEXT_PRIMARY),
+                        url_style,
                     ),
                     Span::styled(format!(" {status_str}"), Style::default().fg(TEXT_SECONDARY)),
                 ]))

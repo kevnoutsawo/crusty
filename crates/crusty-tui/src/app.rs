@@ -208,6 +208,14 @@ pub struct App {
     pub sidebar_selected: usize,
     /// Expanded collection indices (which collections are expanded).
     pub sidebar_expanded: Vec<bool>,
+    /// Which section of sidebar is focused: 0 = collections, 1 = history.
+    pub sidebar_section: u8,
+    /// Selected index in the history list.
+    pub history_selected: usize,
+    /// Whether history search is active.
+    pub history_search_active: bool,
+    /// History search buffer.
+    pub history_search_buf: String,
     /// Whether to show help overlay.
     pub show_help: bool,
 
@@ -302,6 +310,10 @@ impl App {
             sidebar_visible: true,
             sidebar_selected: 0,
             sidebar_expanded: Vec::new(),
+            sidebar_section: 0,
+            history_selected: 0,
+            history_search_active: false,
+            history_search_buf: String::new(),
             show_help: false,
             curl_import_open: false,
             curl_import_buf: String::new(),
@@ -430,6 +442,63 @@ impl App {
         }
 
         Ok(resolved)
+    }
+
+    /// Load a history entry into the editor.
+    pub fn load_history_entry(&mut self, index: usize) {
+        // Clone the entry data to avoid borrow conflict
+        let entry = {
+            let filtered = self.filtered_history();
+            match filtered.get(index) {
+                Some(e) => (e.url.clone(), e.method.clone(), e.request_data.clone()),
+                None => return,
+            }
+        };
+        let (url, method, request_data) = entry;
+
+        self.url_input = url;
+        self.url_cursor = self.url_input.len();
+        self.method = match method.as_str() {
+            "GET" => HttpMethod::Get,
+            "POST" => HttpMethod::Post,
+            "PUT" => HttpMethod::Put,
+            "PATCH" => HttpMethod::Patch,
+            "DELETE" => HttpMethod::Delete,
+            "HEAD" => HttpMethod::Head,
+            _ => HttpMethod::Get,
+        };
+        // Try to restore headers/params/body from request_data JSON
+        if let Ok(data) = serde_json::from_str::<serde_json::Value>(&request_data) {
+            if let Some(headers) = data.get("headers") {
+                if let Ok(h) = serde_json::from_value::<Vec<KeyValue>>(headers.clone()) {
+                    self.headers = h;
+                }
+            }
+            if let Some(params) = data.get("params") {
+                if let Ok(p) = serde_json::from_value::<Vec<KeyValue>>(params.clone()) {
+                    self.params = p;
+                }
+            }
+            if let Some(body) = data.get("body").and_then(|v| v.as_str()) {
+                self.body_input = body.to_string();
+            }
+        }
+    }
+
+    /// Get filtered history based on search.
+    pub fn filtered_history(&self) -> Vec<&crusty_store::HistoryEntry> {
+        if self.history_search_buf.is_empty() {
+            self.history.iter().collect()
+        } else {
+            let search = self.history_search_buf.to_lowercase();
+            self.history
+                .iter()
+                .filter(|h| {
+                    h.url.to_lowercase().contains(&search)
+                        || h.method.to_lowercase().contains(&search)
+                })
+                .collect()
+        }
     }
 
     /// Load environments from the store.
