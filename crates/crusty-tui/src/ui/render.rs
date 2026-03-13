@@ -33,6 +33,16 @@ pub fn render(frame: &mut Frame, app: &App) {
         return;
     }
 
+    if app.curl_import_open {
+        render_curl_import_overlay(frame, app, area);
+        return;
+    }
+
+    if app.codegen_open {
+        render_codegen_overlay(frame, app, area);
+        return;
+    }
+
     let main_chunks = if app.sidebar_visible {
         Layout::default()
             .direction(Direction::Horizontal)
@@ -671,7 +681,7 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             ""
         };
         format!(
-            "Tab: Switch pane │ Ctrl+Enter: Send │ ?: Help │ Ctrl+B: Sidebar{env_hint} │ q: Quit"
+            "Tab: Switch pane │ Ctrl+Enter: Send │ Ctrl+I: Import cURL │ Ctrl+G: Code gen │ ?: Help{env_hint} │ q: Quit"
         )
     };
 
@@ -703,6 +713,8 @@ fn render_help_overlay(frame: &mut Frame, area: Rect) {
         ("d", "Delete key-value row"),
         ("Space", "Toggle row enabled/disabled"),
         ("e / Enter", "Edit selected row"),
+        ("Ctrl+I", "Import cURL command"),
+        ("Ctrl+G", "Generate code snippet"),
         ("g / G", "Scroll to top / bottom"),
         ("?", "Toggle this help"),
         ("q / Ctrl+C", "Quit"),
@@ -719,6 +731,142 @@ fn render_help_overlay(frame: &mut Frame, area: Rect) {
         .collect();
 
     frame.render_widget(Paragraph::new(lines).block(block), help_area);
+}
+
+fn render_curl_import_overlay(frame: &mut Frame, app: &App, area: Rect) {
+    let popup = centered_rect(70, 30, area);
+
+    frame.render_widget(
+        Block::default().style(Style::default().bg(BG_PRIMARY)),
+        area,
+    );
+
+    let block = Block::default()
+        .title(" Import cURL Command ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT_BLUE))
+        .style(Style::default().bg(BG_ELEVATED));
+
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(2), // Instruction
+            Constraint::Length(3), // Input
+            Constraint::Min(1),   // Error / status
+        ])
+        .split(inner);
+
+    frame.render_widget(
+        Paragraph::new("  Paste a cURL command and press Enter to import:")
+            .style(Style::default().fg(TEXT_SECONDARY)),
+        chunks[0],
+    );
+
+    let input_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT_BLUE))
+        .style(Style::default().bg(BG_SURFACE));
+
+    let input_display = if app.curl_import_buf.is_empty() {
+        Span::styled("curl https://...", Style::default().fg(TEXT_SECONDARY))
+    } else {
+        Span::styled(&app.curl_import_buf, Style::default().fg(TEXT_PRIMARY))
+    };
+
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![input_display])).block(input_block),
+        chunks[1],
+    );
+
+    // Cursor
+    let cursor_x = chunks[1].x + 1 + app.curl_import_cursor as u16;
+    let cursor_y = chunks[1].y + 1;
+    frame.set_cursor_position((cursor_x.min(chunks[1].x + chunks[1].width - 2), cursor_y));
+
+    // Error message
+    if let Some(ref err) = app.curl_import_error {
+        frame.render_widget(
+            Paragraph::new(format!("  Error: {err}"))
+                .style(Style::default().fg(STATUS_ERROR)),
+            chunks[2],
+        );
+    } else {
+        frame.render_widget(
+            Paragraph::new("  Enter: Import │ Esc: Cancel")
+                .style(Style::default().fg(TEXT_SECONDARY)),
+            chunks[2],
+        );
+    }
+}
+
+fn render_codegen_overlay(frame: &mut Frame, app: &App, area: Rect) {
+    let popup = centered_rect(80, 80, area);
+
+    frame.render_widget(
+        Block::default().style(Style::default().bg(BG_PRIMARY)),
+        area,
+    );
+
+    let block = Block::default()
+        .title(" Generate Code ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT_BLUE))
+        .style(Style::default().bg(BG_ELEVATED));
+
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(22), Constraint::Min(30)])
+        .split(inner);
+
+    // Language selector
+    let langs = crusty_export::codegen::Language::all();
+    let lang_items: Vec<ListItem> = langs
+        .iter()
+        .enumerate()
+        .map(|(i, lang)| {
+            let style = if i == app.codegen_lang_index {
+                Style::default()
+                    .fg(ACCENT_BLUE)
+                    .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            } else {
+                Style::default().fg(TEXT_PRIMARY)
+            };
+            ListItem::new(format!("  {} ", lang.label())).style(style)
+        })
+        .collect();
+
+    let lang_block = Block::default()
+        .title(" Language ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(BORDER))
+        .style(Style::default().bg(BG_SURFACE));
+
+    frame.render_widget(List::new(lang_items).block(lang_block), chunks[0]);
+
+    // Generated code
+    let selected_lang = langs[app.codegen_lang_index];
+    let def = app.build_request_definition();
+    let code = crusty_export::codegen::generate(&def, selected_lang);
+
+    let code_block = Block::default()
+        .title(format!(" {} ", selected_lang.label()))
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(BORDER))
+        .style(Style::default().bg(BG_SURFACE));
+
+    frame.render_widget(
+        Paragraph::new(code)
+            .style(Style::default().fg(TEXT_PRIMARY))
+            .wrap(Wrap { trim: false })
+            .block(code_block),
+        chunks[1],
+    );
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

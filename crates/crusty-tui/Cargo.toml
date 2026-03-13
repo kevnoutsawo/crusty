@@ -14,6 +14,7 @@ crusty-core = { path = "../crusty-core" }
 crusty-http = { path = "../crusty-http" }
 crusty-store = { path = "../crusty-store" }
 crusty-auth = { path = "../crusty-auth" }
+crusty-export = { path = "../crusty-export" }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 tokio = { workspace = true }

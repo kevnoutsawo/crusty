@@ -79,6 +79,16 @@ fn handle_key_event(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         return false;
     }
 
+    // cURL import dialog
+    if app.curl_import_open {
+        return handle_curl_import(app, key);
+    }
+
+    // Code generation dialog
+    if app.codegen_open {
+        return handle_codegen(app, key);
+    }
+
     // If editing a key-value field, handle that first
     if app.kv_mode != KvEditMode::Navigate {
         return handle_kv_edit(app, key);
@@ -87,6 +97,22 @@ fn handle_key_event(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
     // If editing an auth field, handle that
     if app.auth_editing {
         return handle_auth_edit(app, key);
+    }
+
+    // Global: Ctrl+I opens cURL import
+    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('i') {
+        app.curl_import_open = true;
+        app.curl_import_buf.clear();
+        app.curl_import_cursor = 0;
+        app.curl_import_error = None;
+        return true;
+    }
+
+    // Global: Ctrl+G opens code generation
+    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('g') {
+        app.codegen_open = true;
+        app.codegen_lang_index = 0;
+        return true;
     }
 
     // Global: Ctrl+B toggles sidebar
@@ -394,6 +420,62 @@ fn auth_field_count(auth_type: AuthType) -> usize {
         AuthType::Basic => 2,
         AuthType::ApiKey => 2,
     }
+}
+
+// --- cURL Import Dialog ---
+
+fn handle_curl_import(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
+    match key.code {
+        KeyCode::Char(c) => {
+            app.curl_import_buf.insert(app.curl_import_cursor, c);
+            app.curl_import_cursor += 1;
+            app.curl_import_error = None;
+        }
+        KeyCode::Backspace => {
+            if app.curl_import_cursor > 0 {
+                app.curl_import_cursor -= 1;
+                app.curl_import_buf.remove(app.curl_import_cursor);
+                app.curl_import_error = None;
+            }
+        }
+        KeyCode::Left => app.curl_import_cursor = app.curl_import_cursor.saturating_sub(1),
+        KeyCode::Right => {
+            app.curl_import_cursor = (app.curl_import_cursor + 1).min(app.curl_import_buf.len())
+        }
+        KeyCode::Home => app.curl_import_cursor = 0,
+        KeyCode::End => app.curl_import_cursor = app.curl_import_buf.len(),
+        KeyCode::Enter => {
+            match crusty_export::curl::import(&app.curl_import_buf) {
+                Ok(def) => {
+                    app.apply_curl_import(&def);
+                    app.curl_import_open = false;
+                }
+                Err(e) => {
+                    app.curl_import_error = Some(e.to_string());
+                }
+            }
+        }
+        KeyCode::Esc => app.curl_import_open = false,
+        _ => {}
+    }
+    true
+}
+
+// --- Code Generation Dialog ---
+
+fn handle_codegen(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
+    let langs = crusty_export::codegen::Language::all();
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down => {
+            app.codegen_lang_index = (app.codegen_lang_index + 1).min(langs.len() - 1);
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.codegen_lang_index = app.codegen_lang_index.saturating_sub(1);
+        }
+        KeyCode::Esc | KeyCode::Char('q') => app.codegen_open = false,
+        _ => {}
+    }
+    true
 }
 
 // --- Helpers ---

@@ -179,6 +179,21 @@ pub struct App {
     pub sidebar_visible: bool,
     /// Whether to show help overlay.
     pub show_help: bool,
+
+    // --- Dialogs ---
+    /// Whether the cURL import dialog is open.
+    pub curl_import_open: bool,
+    /// Text buffer for cURL import input.
+    pub curl_import_buf: String,
+    /// Cursor position in the cURL import buffer.
+    pub curl_import_cursor: usize,
+    /// Error from cURL import parsing.
+    pub curl_import_error: Option<String>,
+
+    /// Whether the code generation dialog is open.
+    pub codegen_open: bool,
+    /// Selected language index for code generation.
+    pub codegen_lang_index: usize,
 }
 
 impl App {
@@ -225,6 +240,12 @@ impl App {
             collections: Vec::new(),
             sidebar_visible: true,
             show_help: false,
+            curl_import_open: false,
+            curl_import_buf: String::new(),
+            curl_import_cursor: 0,
+            curl_import_error: None,
+            codegen_open: false,
+            codegen_lang_index: 0,
         }
     }
 
@@ -333,6 +354,32 @@ impl App {
         }
 
         Ok(resolved)
+    }
+
+    /// Build a RequestDefinition from current state (for export/codegen).
+    pub fn build_request_definition(&self) -> RequestDefinition {
+        let mut def = RequestDefinition::new("TUI Request", &self.url_input);
+        def.method = self.method;
+        def.headers = self.headers.clone();
+        def.params = self.params.clone();
+        if !self.body_input.trim().is_empty() {
+            def.body = RequestBody::Json(self.body_input.clone());
+        }
+        def
+    }
+
+    /// Apply a parsed cURL import to the current app state.
+    pub fn apply_curl_import(&mut self, def: &RequestDefinition) {
+        self.url_input = def.url.clone();
+        self.url_cursor = self.url_input.len();
+        self.method = def.method;
+        self.headers = def.headers.clone();
+        self.params = def.params.clone();
+        match &def.body {
+            RequestBody::Json(json) => self.body_input = json.clone(),
+            RequestBody::Raw { content, .. } => self.body_input = content.clone(),
+            _ => {}
+        }
     }
 
     /// Get the current key-value list being edited (params or headers).
