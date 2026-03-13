@@ -236,6 +236,23 @@ pub struct App {
     pub save_collection_index: usize,
     /// Whether we're editing the name (true) or selecting collection (false).
     pub save_editing_name: bool,
+
+    /// Whether the environment editor dialog is open.
+    pub env_dialog_open: bool,
+    /// Index of the environment being edited in the dialog.
+    pub env_dialog_index: usize,
+    /// Selected variable row in env editor.
+    pub env_var_selected: usize,
+    /// Editing mode in env editor: 0=navigate, 1=edit key, 2=edit value.
+    pub env_var_edit_mode: u8,
+    /// Edit buffer for env variable editing.
+    pub env_var_edit_buf: String,
+    /// Cursor in env variable edit buffer.
+    pub env_var_edit_cursor: usize,
+    /// Buffer for new environment name.
+    pub env_name_buf: String,
+    /// Whether we're editing the env name.
+    pub env_editing_name: bool,
 }
 
 impl App {
@@ -297,6 +314,14 @@ impl App {
             save_name_cursor: 0,
             save_collection_index: 0,
             save_editing_name: true,
+            env_dialog_open: false,
+            env_dialog_index: 0,
+            env_var_selected: 0,
+            env_var_edit_mode: 0,
+            env_var_edit_buf: String::new(),
+            env_var_edit_cursor: 0,
+            env_name_buf: String::new(),
+            env_editing_name: false,
         }
     }
 
@@ -405,6 +430,30 @@ impl App {
         }
 
         Ok(resolved)
+    }
+
+    /// Load environments from the store.
+    pub fn load_environments(&mut self) {
+        if let Some(ref store) = self.store {
+            if let Ok(env_list) = store.list_environments() {
+                let mut envs = Vec::new();
+                for (id, _name) in &env_list {
+                    if let Ok(env) = store.get_environment(id) {
+                        envs.push(env);
+                    }
+                }
+                self.environments = envs;
+            }
+        }
+    }
+
+    /// Save the current environment to the store.
+    pub fn save_current_environment(&self) {
+        if let Some(ref store) = self.store {
+            if let Some(env) = self.active_environment() {
+                let _ = store.save_environment(env);
+            }
+        }
     }
 
     /// Load collections from the store.

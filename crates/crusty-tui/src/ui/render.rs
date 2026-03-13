@@ -48,6 +48,11 @@ pub fn render(frame: &mut Frame, app: &App) {
         return;
     }
 
+    if app.env_dialog_open {
+        render_env_dialog(frame, app, area);
+        return;
+    }
+
     let main_chunks = if app.sidebar_visible {
         Layout::default()
             .direction(Direction::Horizontal)
@@ -791,6 +796,8 @@ fn render_help_overlay(frame: &mut Frame, area: Rect) {
         ("e / Enter", "Edit selected row"),
         ("Ctrl+I", "Import cURL command"),
         ("Ctrl+G", "Generate code snippet"),
+        ("Ctrl+S", "Save request to collection"),
+        ("Ctrl+N", "Environment editor"),
         ("g / G", "Scroll to top / bottom"),
         ("?", "Toggle this help"),
         ("q / Ctrl+C", "Quit"),
@@ -876,6 +883,136 @@ fn render_curl_import_overlay(frame: &mut Frame, app: &App, area: Rect) {
             chunks[2],
         );
     }
+}
+
+fn render_env_dialog(frame: &mut Frame, app: &App, area: Rect) {
+    let popup = centered_rect(70, 70, area);
+
+    frame.render_widget(
+        Block::default().style(Style::default().bg(BG_PRIMARY)),
+        area,
+    );
+
+    let env_name = app
+        .environments
+        .get(app.env_dialog_index)
+        .map(|e| e.name.as_str())
+        .unwrap_or("(none)");
+
+    let title = format!(
+        " Environment: {} ({}/{}) ",
+        if app.env_editing_name {
+            &app.env_name_buf
+        } else {
+            env_name
+        },
+        app.env_dialog_index + 1,
+        app.environments.len()
+    );
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT_BLUE))
+        .style(Style::default().bg(BG_ELEVATED));
+
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(3),   // Variables
+            Constraint::Length(1), // Hints
+        ])
+        .split(inner);
+
+    // Variables list
+    if let Some(env) = app.environments.get(app.env_dialog_index) {
+        if env.variables.is_empty() {
+            frame.render_widget(
+                Paragraph::new("  No variables. Press 'a' to add one.")
+                    .style(Style::default().fg(TEXT_SECONDARY)),
+                chunks[0],
+            );
+        } else {
+            let items: Vec<ListItem> = env
+                .variables
+                .iter()
+                .enumerate()
+                .map(|(i, var)| {
+                    let is_selected = i == app.env_var_selected;
+                    let prefix = if var.enabled { "●" } else { "○" };
+
+                    // If editing this row
+                    if is_selected && app.env_var_edit_mode > 0 {
+                        let (key_str, val_str) = match app.env_var_edit_mode {
+                            1 => (
+                                format!("▸{}◂", app.env_var_edit_buf),
+                                var.value.reveal().to_string(),
+                            ),
+                            2 => (
+                                var.key.clone(),
+                                format!("▸{}◂", app.env_var_edit_buf),
+                            ),
+                            _ => (var.key.clone(), var.value.reveal().to_string()),
+                        };
+                        return ListItem::new(Line::from(vec![
+                            Span::styled(format!(" {prefix} "), Style::default().fg(ACCENT_BLUE)),
+                            Span::styled(key_str, Style::default().fg(ACCENT_BLUE)),
+                            Span::styled(" = ", Style::default().fg(TEXT_SECONDARY)),
+                            Span::styled(val_str, Style::default().fg(ACCENT_BLUE)),
+                        ]));
+                    }
+
+                    let base_style = if is_selected {
+                        Style::default()
+                            .fg(TEXT_PRIMARY)
+                            .add_modifier(Modifier::REVERSED)
+                    } else if var.enabled {
+                        Style::default().fg(TEXT_PRIMARY)
+                    } else {
+                        Style::default().fg(TEXT_SECONDARY)
+                    };
+
+                    ListItem::new(Line::from(vec![
+                        Span::styled(
+                            format!(" {prefix} "),
+                            if var.enabled {
+                                Style::default().fg(STATUS_SUCCESS)
+                            } else {
+                                Style::default().fg(TEXT_SECONDARY)
+                            },
+                        ),
+                        Span::styled(&var.key, base_style),
+                        Span::styled(" = ", Style::default().fg(TEXT_SECONDARY)),
+                        Span::styled(var.value.reveal(), base_style),
+                    ]))
+                })
+                .collect();
+
+            let var_block = Block::default()
+                .title(" Variables ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(BORDER))
+                .style(Style::default().bg(BG_SURFACE));
+
+            frame.render_widget(List::new(items).block(var_block), chunks[0]);
+        }
+    }
+
+    // Hints
+    let hints = if app.env_editing_name {
+        "Enter: Save name │ Esc: Cancel"
+    } else if app.env_var_edit_mode > 0 {
+        "Tab: Next field │ Enter: Save │ Esc: Cancel"
+    } else {
+        "a: Add var │ d: Delete │ e: Edit │ Space: Toggle │ n: Rename │ N: New env │ h/l: Switch env │ Esc: Save & close"
+    };
+    frame.render_widget(
+        Paragraph::new(format!("  {hints}")).style(Style::default().fg(TEXT_SECONDARY)),
+        chunks[1],
+    );
 }
 
 fn render_save_dialog(frame: &mut Frame, app: &App, area: Rect) {

@@ -34,6 +34,7 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> miette::R
     let mut app = App::new();
     app.load_history();
     app.load_collections();
+    app.load_environments();
 
     loop {
         terminal
@@ -95,6 +96,11 @@ fn handle_key_event(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         return handle_save_dialog(app, key);
     }
 
+    // Environment dialog
+    if app.env_dialog_open {
+        return handle_env_dialog(app, key);
+    }
+
     // If editing a key-value field, handle that first
     if app.kv_mode != KvEditMode::Navigate {
         return handle_kv_edit(app, key);
@@ -123,6 +129,22 @@ fn handle_key_event(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('g') {
         app.codegen_open = true;
         app.codegen_lang_index = 0;
+        return true;
+    }
+
+    // Global: Ctrl+N opens environment editor
+    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('n') {
+        app.env_dialog_open = true;
+        if app.environments.is_empty() {
+            // Create a new environment
+            let env = crusty_core::environment::Environment::new("New Environment");
+            app.environments.push(env);
+        }
+        app.env_dialog_index = app.active_env_index.unwrap_or(0);
+        app.env_var_selected = 0;
+        app.env_var_edit_mode = 0;
+        app.env_editing_name = false;
+        app.env_name_buf = app.environments[app.env_dialog_index].name.clone();
         return true;
     }
 
@@ -660,6 +682,187 @@ fn handle_save_dialog(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         }
     }
     true
+}
+
+// --- Environment Dialog ---
+
+fn handle_env_dialog(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
+    // Editing env name
+    if app.env_editing_name {
+        match key.code {
+            KeyCode::Char(c) => app.env_name_buf.push(c),
+            KeyCode::Backspace => { app.env_name_buf.pop(); }
+            KeyCode::Enter | KeyCode::Esc => {
+                // Apply name
+                if let Some(env) = app.environments.get_mut(app.env_dialog_index) {
+                    env.name = app.env_name_buf.clone();
+                }
+                app.env_editing_name = false;
+            }
+            _ => {}
+        }
+        return true;
+    }
+
+    // Editing a variable key/value
+    if app.env_var_edit_mode > 0 {
+        match key.code {
+            KeyCode::Char(c) => {
+                app.env_var_edit_buf.insert(app.env_var_edit_cursor, c);
+                app.env_var_edit_cursor += 1;
+            }
+            KeyCode::Backspace => {
+                if app.env_var_edit_cursor > 0 {
+                    app.env_var_edit_cursor -= 1;
+                    app.env_var_edit_buf.remove(app.env_var_edit_cursor);
+                }
+            }
+            KeyCode::Left => app.env_var_edit_cursor = app.env_var_edit_cursor.saturating_sub(1),
+            KeyCode::Right => {
+                app.env_var_edit_cursor =
+                    (app.env_var_edit_cursor + 1).min(app.env_var_edit_buf.len())
+            }
+            KeyCode::Tab | KeyCode::Enter => {
+                // Save field and move to next
+                save_env_var_field(app);
+                if app.env_var_edit_mode == 1 {
+                    // Move to value
+                    app.env_var_edit_mode = 2;
+                    if let Some(env) = app.environments.get(app.env_dialog_index) {
+                        if let Some(var) = env.variables.get(app.env_var_selected) {
+                            app.env_var_edit_buf = var.value.reveal().to_string();
+                            app.env_var_edit_cursor = app.env_var_edit_buf.len();
+                        }
+                    }
+                } else {
+                    app.env_var_edit_mode = 0;
+                }
+            }
+            KeyCode::Esc => {
+                app.env_var_edit_mode = 0;
+            }
+            _ => {}
+        }
+        return true;
+    }
+
+    // Navigation mode
+    match key.code {
+        KeyCode::Char('j') | KeyCode::Down => {
+            if let Some(env) = app.environments.get(app.env_dialog_index) {
+                if !env.variables.is_empty() {
+                    app.env_var_selected =
+                        (app.env_var_selected + 1).min(env.variables.len() - 1);
+                }
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.env_var_selected = app.env_var_selected.saturating_sub(1);
+        }
+        KeyCode::Char('a') => {
+            // Add variable
+            if let Some(env) = app.environments.get_mut(app.env_dialog_index) {
+                env.add_variable("", "");
+                app.env_var_selected = env.variables.len() - 1;
+                app.env_var_edit_mode = 1;
+                app.env_var_edit_buf.clear();
+                app.env_var_edit_cursor = 0;
+            }
+        }
+        KeyCode::Char('d') => {
+            // Delete variable
+            if let Some(env) = app.environments.get_mut(app.env_dialog_index) {
+                if !env.variables.is_empty() {
+                    let idx = app.env_var_selected;
+                    env.variables.remove(idx);
+                    if app.env_var_selected > 0 && app.env_var_selected >= env.variables.len() {
+                        app.env_var_selected -= 1;
+                    }
+                }
+            }
+        }
+        KeyCode::Char('e') | KeyCode::Enter => {
+            // Edit selected variable key
+            if let Some(env) = app.environments.get(app.env_dialog_index) {
+                if let Some(var) = env.variables.get(app.env_var_selected) {
+                    app.env_var_edit_mode = 1;
+                    app.env_var_edit_buf = var.key.clone();
+                    app.env_var_edit_cursor = app.env_var_edit_buf.len();
+                }
+            }
+        }
+        KeyCode::Char(' ') => {
+            // Toggle variable enabled
+            let idx = app.env_var_selected;
+            if let Some(env) = app.environments.get_mut(app.env_dialog_index) {
+                if let Some(var) = env.variables.get_mut(idx) {
+                    var.enabled = !var.enabled;
+                }
+            }
+        }
+        KeyCode::Char('n') => {
+            // Edit env name
+            app.env_editing_name = true;
+        }
+        KeyCode::Char('N') => {
+            // Create new environment
+            let env = crusty_core::environment::Environment::new("New Environment");
+            app.environments.push(env);
+            app.env_dialog_index = app.environments.len() - 1;
+            app.env_var_selected = 0;
+            app.env_name_buf = "New Environment".to_string();
+            app.env_editing_name = true;
+        }
+        KeyCode::Char('l') | KeyCode::Right => {
+            // Next environment
+            if !app.environments.is_empty() {
+                app.env_dialog_index =
+                    (app.env_dialog_index + 1) % app.environments.len();
+                app.env_var_selected = 0;
+                app.env_name_buf = app.environments[app.env_dialog_index].name.clone();
+            }
+        }
+        KeyCode::Char('h') | KeyCode::Left => {
+            // Previous environment
+            if !app.environments.is_empty() {
+                app.env_dialog_index = if app.env_dialog_index == 0 {
+                    app.environments.len() - 1
+                } else {
+                    app.env_dialog_index - 1
+                };
+                app.env_var_selected = 0;
+                app.env_name_buf = app.environments[app.env_dialog_index].name.clone();
+            }
+        }
+        KeyCode::Esc | KeyCode::Char('q') => {
+            // Save and close
+            if let Some(ref store) = app.store {
+                for env in &app.environments {
+                    let _ = store.save_environment(env);
+                }
+            }
+            // Set active env to the one we were editing
+            app.active_env_index = Some(app.env_dialog_index);
+            app.env_dialog_open = false;
+        }
+        _ => {}
+    }
+    true
+}
+
+fn save_env_var_field(app: &mut App) {
+    let idx = app.env_var_selected;
+    let buf = app.env_var_edit_buf.clone();
+    let mode = app.env_var_edit_mode;
+    if let Some(env) = app.environments.get_mut(app.env_dialog_index) {
+        if let Some(var) = env.variables.get_mut(idx) {
+            match mode {
+                1 => var.key = buf,
+                2 => var.value = crusty_core::environment::VariableValue::Plain(buf),
+                _ => {}
+            }
+        }
+    }
 }
 
 // --- Helpers ---
