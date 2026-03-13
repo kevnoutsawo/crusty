@@ -789,6 +789,18 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         "a: Add │ d: Delete │ Space: Toggle │ e/Enter: Edit │ Tab: Next pane".to_string()
     } else if app.focus == FocusedPane::SendButton {
         "Enter/Space: Send request │ Tab: Next pane │ Esc: Response".to_string()
+    } else if app.focus == FocusedPane::UrlBar {
+        "Enter: Send │ Tab: Edit request │ m: Method │ Esc: Response │ Ctrl+R: Send │ ?: Help".to_string()
+    } else if app.focus == FocusedPane::ResponseBody {
+        "j/k: Scroll │ 1-5: Request tabs │ F1-F4: Response tabs │ i/Enter: URL bar │ Shift+Tab: Send btn │ ?: Help".to_string()
+    } else if app.focus == FocusedPane::Sidebar && app.sidebar_section == 0 {
+        "j/k: Navigate │ Enter/l: Expand/Load │ h: Collapse │ 2: History │ /: Search │ Tab: URL bar".to_string()
+    } else if app.focus == FocusedPane::Sidebar && app.sidebar_section == 1 {
+        if app.history_search_active {
+            "Type to filter │ Enter: Apply │ Esc: Cancel search".to_string()
+        } else {
+            "j/k: Navigate │ Enter: Load request │ /: Search │ 1: Collections │ Tab: URL bar".to_string()
+        }
     } else {
         let env_hint = if !app.environments.is_empty() {
             " │ Ctrl+E: Switch env"
