@@ -116,6 +116,11 @@ fn handle_key_event(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         return handle_body_edit(app, key);
     }
 
+    // If editing script, handle that
+    if app.script_editing {
+        return handle_script_edit(app, key);
+    }
+
     // Global: Ctrl+I opens cURL import
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('i') {
         app.curl_import_open = true;
@@ -159,6 +164,13 @@ fn handle_key_event(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         app.save_name_cursor = app.save_name_buf.len();
         app.save_collection_index = 0;
         app.save_editing_name = true;
+        return true;
+    }
+
+    // Global: Ctrl+T runs test script on current response
+    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('t') {
+        run_test_script(app);
+        app.response_tab = ResponseTab::Tests;
         return true;
     }
 
@@ -224,13 +236,16 @@ fn handle_url_input(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         (_, KeyCode::Home) => app.url_cursor = 0,
         (_, KeyCode::End) => app.url_cursor = app.url_input.len(),
         (_, KeyCode::Tab) => {
-            // Tab into the request pane's key-value editor or body editor
+            // Tab into the request pane's key-value editor, body editor, or script editor
             if matches!(app.request_tab, RequestTab::Params | RequestTab::Headers) {
                 app.focus = FocusedPane::KeyValueEditor;
                 app.kv_selected = 0;
             } else if app.request_tab == RequestTab::Body {
                 app.body_editing = true;
                 app.body_cursor = app.body_input.len();
+            } else if app.request_tab == RequestTab::Script {
+                app.script_editing = true;
+                app.script_cursor = app.script_input.len();
             } else {
                 app.focus = FocusedPane::ResponseBody;
             }
@@ -265,9 +280,11 @@ fn handle_response(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         KeyCode::Char('2') => app.request_tab = RequestTab::Headers,
         KeyCode::Char('3') => app.request_tab = RequestTab::Body,
         KeyCode::Char('4') => app.request_tab = RequestTab::Auth,
+        KeyCode::Char('5') => app.request_tab = RequestTab::Script,
         KeyCode::F(1) => app.response_tab = ResponseTab::Body,
         KeyCode::F(2) => app.response_tab = ResponseTab::Headers,
         KeyCode::F(3) => app.response_tab = ResponseTab::Timing,
+        KeyCode::F(4) => app.response_tab = ResponseTab::Tests,
         KeyCode::Char('i') | KeyCode::Enter => app.focus = FocusedPane::UrlBar,
         KeyCode::Char('b') => {
             // Quick-enter body editing from response pane
@@ -470,6 +487,7 @@ fn handle_kv_navigate(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         KeyCode::Char('2') => app.request_tab = RequestTab::Headers,
         KeyCode::Char('3') => app.request_tab = RequestTab::Body,
         KeyCode::Char('4') => app.request_tab = RequestTab::Auth,
+        KeyCode::Char('5') => app.request_tab = RequestTab::Script,
         _ => {}
     }
     true
@@ -953,6 +971,117 @@ fn handle_fallback(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         _ => {}
     }
     true
+}
+
+// --- Script Editor ---
+
+fn handle_script_edit(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
+    match key.code {
+        KeyCode::Char(c) => {
+            app.script_input.insert(app.script_cursor, c);
+            app.script_cursor += 1;
+        }
+        KeyCode::Enter => {
+            app.script_input.insert(app.script_cursor, '\n');
+            app.script_cursor += 1;
+        }
+        KeyCode::Backspace => {
+            if app.script_cursor > 0 {
+                app.script_cursor -= 1;
+                app.script_input.remove(app.script_cursor);
+            }
+        }
+        KeyCode::Delete => {
+            if app.script_cursor < app.script_input.len() {
+                app.script_input.remove(app.script_cursor);
+            }
+        }
+        KeyCode::Left => app.script_cursor = app.script_cursor.saturating_sub(1),
+        KeyCode::Right => app.script_cursor = (app.script_cursor + 1).min(app.script_input.len()),
+        KeyCode::Home => {
+            let before = &app.script_input[..app.script_cursor];
+            app.script_cursor = before.rfind('\n').map(|p| p + 1).unwrap_or(0);
+        }
+        KeyCode::End => {
+            let after = &app.script_input[app.script_cursor..];
+            app.script_cursor += after.find('\n').unwrap_or(after.len());
+        }
+        KeyCode::Esc => {
+            app.script_editing = false;
+        }
+        _ => {}
+    }
+    true
+}
+
+// --- Test Runner ---
+
+fn run_test_script(app: &mut App) {
+    let Some(ref resp) = app.response else {
+        app.error = Some("No response to test against".to_string());
+        return;
+    };
+
+    if app.script_input.trim().is_empty() {
+        app.error = Some("No test script to run (edit in Script tab)".to_string());
+        return;
+    }
+
+    let engine = crusty_scripting::engine::ScriptEngine::new();
+    let body_text = resp.body_text().map(|s| s.to_string()).unwrap_or_default();
+
+    let ctx = crusty_scripting::context::PostRequestContext {
+        url: app.url_input.clone(),
+        method: app.method.as_str().to_string(),
+        status: resp.status,
+        status_text: resp.status_text.clone(),
+        response_headers: resp.headers.clone(),
+        response_body: body_text,
+        response_time_ms: resp.timing.total.as_millis() as u64,
+        variables: std::collections::HashMap::new(),
+    };
+
+    match engine.run_post_request(&app.script_input, &ctx) {
+        Ok(result) => {
+            let test_entries: Vec<crusty_testing::runner::TestResultEntry> = result
+                .tests
+                .into_iter()
+                .map(|t| crusty_testing::runner::TestResultEntry {
+                    name: t.name,
+                    passed: t.passed,
+                    error: t.error,
+                })
+                .collect();
+
+            let passed = test_entries.iter().filter(|t| t.passed).count();
+            let total = test_entries.len();
+
+            app.test_results = Some(crusty_testing::runner::CollectionRunResult {
+                collection_name: "Ad-hoc Test".to_string(),
+                request_results: vec![crusty_testing::runner::RequestRunResult {
+                    name: app.url_input.clone(),
+                    url: app.url_input.clone(),
+                    method: app.method.as_str().to_string(),
+                    status: Some(resp.status),
+                    duration_ms: resp.timing.total.as_millis() as u64,
+                    tests: test_entries,
+                    error: None,
+                    logs: result.logs.clone(),
+                }],
+                total_duration_ms: resp.timing.total.as_millis() as u64,
+                total_tests: total,
+                passed_tests: passed,
+                failed_tests: total - passed,
+                timestamp: chrono::Utc::now().to_rfc3339(),
+            });
+            app.script_logs = result.logs;
+            app.test_result_scroll = 0;
+            app.error = None;
+        }
+        Err(e) => {
+            app.error = Some(format!("Script error: {e}"));
+        }
+    }
 }
 
 async fn send_request(app: &mut App) {

@@ -356,7 +356,7 @@ fn render_request_pane(frame: &mut Frame, app: &App, area: Rect) {
         ))
         .style(Style::default().bg(BG_SURFACE));
 
-    let tabs = Tabs::new(vec!["Params", "Headers", "Body", "Auth"])
+    let tabs = Tabs::new(vec!["Params", "Headers", "Body", "Auth", "Script"])
         .select(app.request_tab as usize)
         .style(Style::default().fg(TEXT_SECONDARY))
         .highlight_style(Style::default().fg(ACCENT_BLUE).add_modifier(Modifier::BOLD))
@@ -384,6 +384,9 @@ fn render_request_pane(frame: &mut Frame, app: &App, area: Rect) {
         }
         RequestTab::Auth => {
             render_auth_form(frame, app, tab_chunks[1]);
+        }
+        RequestTab::Script => {
+            render_script_editor(frame, app, tab_chunks[1]);
         }
     }
 }
@@ -644,7 +647,7 @@ fn render_response_pane(frame: &mut Frame, app: &App, area: Rect) {
         return;
     };
 
-    let tabs = Tabs::new(vec!["Body", "Headers", "Timing"])
+    let tabs = Tabs::new(vec!["Body", "Headers", "Timing", "Tests"])
         .select(app.response_tab as usize)
         .style(Style::default().fg(TEXT_SECONDARY))
         .highlight_style(Style::default().fg(ACCENT_BLUE).add_modifier(Modifier::BOLD))
@@ -661,6 +664,7 @@ fn render_response_pane(frame: &mut Frame, app: &App, area: Rect) {
         ResponseTab::Body => render_response_body(frame, response, app.response_scroll, tab_chunks[1]),
         ResponseTab::Headers => render_response_headers(frame, response, tab_chunks[1]),
         ResponseTab::Timing => render_response_timing(frame, response, tab_chunks[1]),
+        ResponseTab::Tests => render_test_results(frame, app, tab_chunks[1]),
     }
 }
 
@@ -768,7 +772,9 @@ fn render_response_timing(frame: &mut Frame, response: &HttpResponse, area: Rect
 }
 
 fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
-    let hints = if app.body_editing {
+    let hints = if app.script_editing {
+        "Type to edit script │ Ctrl+T: Run │ Esc: Stop editing".to_string()
+    } else if app.body_editing {
         "Type to edit body │ Esc: Stop editing".to_string()
     } else if app.method_selector_open {
         "↑↓: Select method │ Enter: Confirm │ Esc: Cancel".to_string()
@@ -810,8 +816,9 @@ fn render_help_overlay(frame: &mut Frame, area: Rect) {
         ("Ctrl+B", "Toggle sidebar"),
         ("Ctrl+E", "Switch environment"),
         ("m", "Open method selector"),
-        ("1-4", "Switch request tabs"),
-        ("F1-F3", "Switch response tabs"),
+        ("1-5", "Switch request tabs (5=Script)"),
+        ("F1-F4", "Switch response tabs (F4=Tests)"),
+        ("Ctrl+T", "Run test script"),
         ("j/k or ↑/↓", "Scroll / navigate"),
         ("a", "Add key-value row (in editor)"),
         ("d", "Delete key-value row"),
@@ -1235,6 +1242,151 @@ fn method_color(method: crusty_core::request::HttpMethod) -> Style {
         _ => TEXT_SECONDARY,
     };
     Style::default().fg(color).bold()
+}
+
+fn render_script_editor(frame: &mut Frame, app: &App, area: Rect) {
+    if !app.script_editing && app.script_input.is_empty() {
+        let hint = "No test script. Press Tab (from URL) or 5 to switch here.\nCtrl+T runs the script against the current response.\n\nExample:\n  test(\"Status is 200\", status == 200);\n  let body = json_parse(response_body);\n  assert_eq(\"Has data\", body[\"count\"], 10);";
+        frame.render_widget(
+            Paragraph::new(hint)
+                .style(Style::default().fg(TEXT_SECONDARY))
+                .wrap(Wrap { trim: false }),
+            area,
+        );
+        return;
+    }
+
+    let border_color = if app.script_editing { ACCENT_BLUE } else { BORDER };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(border_color))
+        .title(" Rhai Script (Ctrl+T to run) ")
+        .title_style(Style::default().fg(TEXT_SECONDARY))
+        .style(Style::default().bg(BG_SURFACE));
+
+    let inner = block.inner(area);
+    frame.render_widget(
+        Paragraph::new(app.script_input.clone())
+            .style(Style::default().fg(TEXT_PRIMARY))
+            .wrap(Wrap { trim: false })
+            .block(block),
+        area,
+    );
+
+    if app.script_editing {
+        let before_cursor = &app.script_input[..app.script_cursor.min(app.script_input.len())];
+        let lines: Vec<&str> = before_cursor.split('\n').collect();
+        let cursor_row = lines.len().saturating_sub(1) as u16;
+        let cursor_col = lines.last().map(|l| l.len()).unwrap_or(0) as u16;
+
+        let cx = inner.x + cursor_col;
+        let cy = inner.y + cursor_row;
+        frame.set_cursor_position((
+            cx.min(inner.x + inner.width.saturating_sub(1)),
+            cy.min(inner.y + inner.height.saturating_sub(1)),
+        ));
+    }
+}
+
+fn render_test_results(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(ref results) = app.test_results else {
+        frame.render_widget(
+            Paragraph::new("  No test results. Write a script (tab 5) and press Ctrl+T to run.")
+                .style(Style::default().fg(TEXT_SECONDARY)),
+            area,
+        );
+        return;
+    };
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Summary line
+    let summary_color = if results.failed_tests == 0 {
+        STATUS_SUCCESS
+    } else {
+        STATUS_ERROR
+    };
+    lines.push(Line::from(vec![
+        Span::styled(
+            format!(
+                " {} passed, {} failed ",
+                results.passed_tests, results.failed_tests
+            ),
+            Style::default().fg(summary_color).bold(),
+        ),
+        Span::styled(
+            format!("({}ms)", results.total_duration_ms),
+            Style::default().fg(TEXT_SECONDARY),
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    // Per-request results
+    for req_result in &results.request_results {
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!(" {} {} ", req_result.method, req_result.name),
+                Style::default().fg(TEXT_PRIMARY).bold(),
+            ),
+            Span::styled(
+                format!(
+                    "[{}] {}ms",
+                    req_result.status.map(|s| s.to_string()).unwrap_or_else(|| "ERR".to_string()),
+                    req_result.duration_ms
+                ),
+                Style::default().fg(TEXT_SECONDARY),
+            ),
+        ]));
+
+        for test in &req_result.tests {
+            let (icon, color) = if test.passed {
+                ("  PASS", STATUS_SUCCESS)
+            } else {
+                ("  FAIL", STATUS_ERROR)
+            };
+            let mut spans = vec![
+                Span::styled(format!("{icon} "), Style::default().fg(color).bold()),
+                Span::styled(&test.name, Style::default().fg(TEXT_PRIMARY)),
+            ];
+            if let Some(ref err) = test.error {
+                spans.push(Span::styled(
+                    format!(" - {err}"),
+                    Style::default().fg(STATUS_ERROR),
+                ));
+            }
+            lines.push(Line::from(spans));
+        }
+
+        if let Some(ref err) = req_result.error {
+            lines.push(Line::from(Span::styled(
+                format!("  ERROR: {err}"),
+                Style::default().fg(STATUS_ERROR),
+            )));
+        }
+
+        // Show logs if any
+        if !req_result.logs.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "  Logs:",
+                Style::default().fg(TEXT_SECONDARY).add_modifier(Modifier::ITALIC),
+            )));
+            for log in &req_result.logs {
+                lines.push(Line::from(Span::styled(
+                    format!("    {log}"),
+                    Style::default().fg(TEXT_SECONDARY),
+                )));
+            }
+        }
+    }
+
+    frame.render_widget(
+        Paragraph::new(lines)
+            .style(Style::default().fg(TEXT_PRIMARY))
+            .scroll((app.test_result_scroll as u16, 0))
+            .wrap(Wrap { trim: false }),
+        area,
+    );
 }
 
 fn method_color_str(method: &str) -> Style {

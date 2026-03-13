@@ -37,6 +37,8 @@ pub enum RequestTab {
     Body,
     /// Authentication.
     Auth,
+    /// Pre/post-request script.
+    Script,
 }
 
 /// Which tab is active in the response section.
@@ -48,7 +50,10 @@ pub enum ResponseTab {
     Headers,
     /// Timing information.
     Timing,
+    /// Test results.
+    Tests,
 }
+
 
 /// Input mode for key-value editor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -261,6 +266,24 @@ pub struct App {
     pub env_name_buf: String,
     /// Whether we're editing the env name.
     pub env_editing_name: bool,
+
+    // --- Scripting & Testing ---
+    /// Post-request test script.
+    pub script_input: String,
+    /// Cursor position in script input.
+    pub script_cursor: usize,
+    /// Whether we're editing the script.
+    pub script_editing: bool,
+    /// Test run results from collection runner.
+    pub test_results: Option<crusty_testing::runner::CollectionRunResult>,
+    /// Whether a test run is in progress.
+    pub test_running: bool,
+    /// Which collection to run tests on (index).
+    pub test_collection_index: usize,
+    /// Selected test result entry for scrolling.
+    pub test_result_scroll: usize,
+    /// Script logs from the last run.
+    pub script_logs: Vec<String>,
 }
 
 impl App {
@@ -334,6 +357,14 @@ impl App {
             env_var_edit_cursor: 0,
             env_name_buf: String::new(),
             env_editing_name: false,
+            script_input: String::new(),
+            script_cursor: 0,
+            script_editing: false,
+            test_results: None,
+            test_running: false,
+            test_collection_index: 0,
+            test_result_scroll: 0,
+            script_logs: Vec::new(),
         }
     }
 
