@@ -5,3 +5,10 @@
 //! This crate owns request construction, response parsing, variable interpolation,
 //! environment resolution, collection tree operations, and orchestration.
 //! It is frontend-agnostic and fully unit-tested.
+
+pub mod collection;
+pub mod environment;
+pub mod error;
+pub mod interpolation;
+pub mod request;
+pub mod response;
