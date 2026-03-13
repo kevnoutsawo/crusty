@@ -2,4 +2,10 @@
 
 //! Authentication flows for Crusty.
 //!
-//! Supports OAuth2, JWT, API Key, Basic, Bearer, Digest, AWS Sig v4, and mTLS.
+//! Supports Bearer, Basic, API Key, OAuth 2.0, and more.
+
+mod error;
+mod provider;
+
+pub use error::AuthError;
+pub use provider::{ApiKeyLocation, AuthConfig, AuthProvider};
