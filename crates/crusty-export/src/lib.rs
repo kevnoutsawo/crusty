@@ -2,4 +2,10 @@
 
 //! Import/export for Crusty.
 //!
-//! Supports Postman, Insomnia, OpenAPI, cURL, and HAR formats.
+//! Supports cURL import/export, with more formats planned
+//! (Postman, Insomnia, OpenAPI, HAR).
+
+pub mod curl;
+mod error;
+
+pub use error::ExportError;
