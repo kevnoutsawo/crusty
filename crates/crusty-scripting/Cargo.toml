@@ -8,4 +8,6 @@ description = "Pre/post-request scripting engine for Crusty"
 [dependencies]
 crusty-core = { path = "../crusty-core" }
 serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
+rhai = { workspace = true }
