@@ -127,6 +127,10 @@ pub struct App {
     // --- Body ---
     /// Request body text (for JSON/raw).
     pub body_input: String,
+    /// Cursor position in body input.
+    pub body_cursor: usize,
+    /// Whether we're editing the body.
+    pub body_editing: bool,
 
     // --- Auth ---
     /// Selected auth type.
@@ -219,6 +223,8 @@ impl App {
             kv_edit_buf: String::new(),
             kv_edit_cursor: 0,
             body_input: String::new(),
+            body_cursor: 0,
+            body_editing: false,
             auth_type: AuthType::None,
             auth_bearer_token: String::new(),
             auth_basic_user: String::new(),

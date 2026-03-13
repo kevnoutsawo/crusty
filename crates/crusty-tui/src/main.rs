@@ -99,6 +99,11 @@ fn handle_key_event(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         return handle_auth_edit(app, key);
     }
 
+    // If editing body, handle that
+    if app.body_editing {
+        return handle_body_edit(app, key);
+    }
+
     // Global: Ctrl+I opens cURL import
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('i') {
         app.curl_import_open = true;
@@ -177,10 +182,13 @@ fn handle_url_input(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         (_, KeyCode::Home) => app.url_cursor = 0,
         (_, KeyCode::End) => app.url_cursor = app.url_input.len(),
         (_, KeyCode::Tab) => {
-            // Tab into the request pane's key-value editor
+            // Tab into the request pane's key-value editor or body editor
             if matches!(app.request_tab, RequestTab::Params | RequestTab::Headers) {
                 app.focus = FocusedPane::KeyValueEditor;
                 app.kv_selected = 0;
+            } else if app.request_tab == RequestTab::Body {
+                app.body_editing = true;
+                app.body_cursor = app.body_input.len();
             } else {
                 app.focus = FocusedPane::ResponseBody;
             }
@@ -219,6 +227,13 @@ fn handle_response(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         KeyCode::F(2) => app.response_tab = ResponseTab::Headers,
         KeyCode::F(3) => app.response_tab = ResponseTab::Timing,
         KeyCode::Char('i') | KeyCode::Enter => app.focus = FocusedPane::UrlBar,
+        KeyCode::Char('b') => {
+            // Quick-enter body editing from response pane
+            if app.request_tab == RequestTab::Body {
+                app.body_editing = true;
+                app.body_cursor = app.body_input.len();
+            }
+        }
         _ => {}
     }
     true
@@ -420,6 +435,49 @@ fn auth_field_count(auth_type: AuthType) -> usize {
         AuthType::Basic => 2,
         AuthType::ApiKey => 2,
     }
+}
+
+// --- Body Editor ---
+
+fn handle_body_edit(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
+    match key.code {
+        KeyCode::Char(c) => {
+            app.body_input.insert(app.body_cursor, c);
+            app.body_cursor += 1;
+        }
+        KeyCode::Enter => {
+            app.body_input.insert(app.body_cursor, '\n');
+            app.body_cursor += 1;
+        }
+        KeyCode::Backspace => {
+            if app.body_cursor > 0 {
+                app.body_cursor -= 1;
+                app.body_input.remove(app.body_cursor);
+            }
+        }
+        KeyCode::Delete => {
+            if app.body_cursor < app.body_input.len() {
+                app.body_input.remove(app.body_cursor);
+            }
+        }
+        KeyCode::Left => app.body_cursor = app.body_cursor.saturating_sub(1),
+        KeyCode::Right => app.body_cursor = (app.body_cursor + 1).min(app.body_input.len()),
+        KeyCode::Home => {
+            // Move to start of current line
+            let before = &app.body_input[..app.body_cursor];
+            app.body_cursor = before.rfind('\n').map(|p| p + 1).unwrap_or(0);
+        }
+        KeyCode::End => {
+            // Move to end of current line
+            let after = &app.body_input[app.body_cursor..];
+            app.body_cursor += after.find('\n').unwrap_or(after.len());
+        }
+        KeyCode::Esc => {
+            app.body_editing = false;
+        }
+        _ => {}
+    }
+    true
 }
 
 // --- cURL Import Dialog ---

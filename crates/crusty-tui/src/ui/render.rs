@@ -311,21 +311,7 @@ fn render_request_pane(frame: &mut Frame, app: &App, area: Rect) {
             render_kv_editor(frame, app, &app.headers, "Headers", tab_chunks[1]);
         }
         RequestTab::Body => {
-            let body_text = if app.body_input.is_empty() {
-                "No body content.".to_string()
-            } else {
-                app.body_input.clone()
-            };
-            frame.render_widget(
-                Paragraph::new(body_text)
-                    .style(Style::default().fg(if app.body_input.is_empty() {
-                        TEXT_SECONDARY
-                    } else {
-                        TEXT_PRIMARY
-                    }))
-                    .wrap(Wrap { trim: false }),
-                tab_chunks[1],
-            );
+            render_body_editor(frame, app, tab_chunks[1]);
         }
         RequestTab::Auth => {
             render_auth_form(frame, app, tab_chunks[1]);
@@ -411,6 +397,53 @@ fn render_kv_editor(
         .collect();
 
     frame.render_widget(List::new(list_items), area);
+}
+
+fn render_body_editor(frame: &mut Frame, app: &App, area: Rect) {
+    if !app.body_editing && app.body_input.is_empty() {
+        let hint = "No body content. Press 'b' or Tab (from URL) to edit.";
+        frame.render_widget(
+            Paragraph::new(hint).style(Style::default().fg(TEXT_SECONDARY)),
+            area,
+        );
+        return;
+    }
+
+    let border_color = if app.body_editing { ACCENT_BLUE } else { BORDER };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(border_color))
+        .style(Style::default().bg(BG_SURFACE));
+
+    let display_text = if app.body_editing && app.body_input.is_empty() {
+        "".to_string()
+    } else {
+        app.body_input.clone()
+    };
+
+    let inner = block.inner(area);
+    frame.render_widget(
+        Paragraph::new(display_text)
+            .style(Style::default().fg(TEXT_PRIMARY))
+            .wrap(Wrap { trim: false })
+            .block(block),
+        area,
+    );
+
+    if app.body_editing {
+        // Calculate cursor position from body_cursor
+        let before_cursor = &app.body_input[..app.body_cursor.min(app.body_input.len())];
+        let lines: Vec<&str> = before_cursor.split('\n').collect();
+        let cursor_row = lines.len().saturating_sub(1) as u16;
+        let cursor_col = lines.last().map(|l| l.len()).unwrap_or(0) as u16;
+
+        let cx = inner.x + cursor_col;
+        let cy = inner.y + cursor_row;
+        frame.set_cursor_position((
+            cx.min(inner.x + inner.width.saturating_sub(1)),
+            cy.min(inner.y + inner.height.saturating_sub(1)),
+        ));
+    }
 }
 
 fn render_auth_form(frame: &mut Frame, app: &App, area: Rect) {
@@ -666,7 +699,9 @@ fn render_response_timing(frame: &mut Frame, response: &HttpResponse, area: Rect
 }
 
 fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
-    let hints = if app.method_selector_open {
+    let hints = if app.body_editing {
+        "Type to edit body │ Esc: Stop editing".to_string()
+    } else if app.method_selector_open {
         "↑↓: Select method │ Enter: Confirm │ Esc: Cancel".to_string()
     } else if app.kv_mode != KvEditMode::Navigate {
         "Tab: Next field │ Enter: Save & next │ Esc: Cancel".to_string()
