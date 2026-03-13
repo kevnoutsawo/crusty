@@ -19,3 +19,5 @@ tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 miette = { workspace = true }
+uuid = { workspace = true }
+url = { workspace = true }
