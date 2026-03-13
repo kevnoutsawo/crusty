@@ -1,0 +1,17 @@
+[package]
+name = "crusty-http"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "HTTP engine for Crusty"
+
+[dependencies]
+crusty-core = { path = "../crusty-core" }
+reqwest = { workspace = true }
+http = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+url = { workspace = true }

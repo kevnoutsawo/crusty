@@ -1,0 +1,12 @@
+[package]
+name = "crusty-export"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Import/export for Crusty (Postman, Insomnia, OpenAPI, cURL, HAR)"
+
+[dependencies]
+crusty-core = { path = "../crusty-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

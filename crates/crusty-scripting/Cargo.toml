@@ -1,0 +1,11 @@
+[package]
+name = "crusty-scripting"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Pre/post-request scripting engine for Crusty"
+
+[dependencies]
+crusty-core = { path = "../crusty-core" }
+serde = { workspace = true }
+thiserror = { workspace = true }

@@ -1,0 +1,15 @@
+[package]
+name = "crusty-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Persistence layer for Crusty (SQLite)"
+
+[dependencies]
+crusty-core = { path = "../crusty-core" }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }

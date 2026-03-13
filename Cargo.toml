@@ -1,0 +1,53 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/crusty-core",
+    "crates/crusty-http",
+    "crates/crusty-proto",
+    "crates/crusty-scripting",
+    "crates/crusty-store",
+    "crates/crusty-auth",
+    "crates/crusty-export",
+    "crates/crusty-testing",
+    "crates/crusty-proxy",
+    "crates/crusty-mock",
+    "crates/crusty-tui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/crusty/crusty"
+description = "A developer-grade HTTP client written in Rust"
+
+[workspace.dependencies]
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Async
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
+# Error handling
+thiserror = "2"
+miette = { version = "7", features = ["fancy"] }
+
+# HTTP
+reqwest = { version = "0.12", features = ["json", "cookies", "rustls-tls", "multipart", "gzip", "brotli", "deflate"] }
+http = "1"
+
+# Storage
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# TUI
+ratatui = "0.29"
+crossterm = "0.28"
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+url = { version = "2", features = ["serde"] }
+base64 = "0.22"
+regex = "1"
