@@ -359,7 +359,7 @@ fn render_request_pane(frame: &mut Frame, app: &App, area: Rect) {
         ))
         .style(Style::default().bg(BG_SURFACE));
 
-    let tabs = Tabs::new(vec!["Params", "Headers", "Body", "Auth", "Script"])
+    let tabs = Tabs::new(vec!["1:Params", "2:Headers", "3:Body", "4:Auth", "5:Script"])
         .select(app.request_tab as usize)
         .style(Style::default().fg(TEXT_SECONDARY))
         .highlight_style(Style::default().fg(ACCENT_BLUE).add_modifier(Modifier::BOLD))
@@ -650,7 +650,7 @@ fn render_response_pane(frame: &mut Frame, app: &App, area: Rect) {
         return;
     };
 
-    let tabs = Tabs::new(vec!["Body", "Headers", "Timing", "Tests"])
+    let tabs = Tabs::new(vec!["F1:Body", "F2:Headers", "F3:Timing", "F4:Tests"])
         .select(app.response_tab as usize)
         .style(Style::default().fg(TEXT_SECONDARY))
         .highlight_style(Style::default().fg(ACCENT_BLUE).add_modifier(Modifier::BOLD))
