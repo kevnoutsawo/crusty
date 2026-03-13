@@ -365,6 +365,7 @@ dependencies = [
 name = "crusty-core"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "chrono",
  "http",
  "regex",
@@ -468,7 +469,9 @@ dependencies = [
 name = "crusty-tui"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "crossterm",
+ "crusty-auth",
  "crusty-core",
  "crusty-http",
  "crusty-store",
@@ -477,6 +480,8 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "url",
+ "uuid",
 ]
 
 [[package]]

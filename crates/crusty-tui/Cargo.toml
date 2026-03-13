@@ -13,6 +13,7 @@ path = "src/main.rs"
 crusty-core = { path = "../crusty-core" }
 crusty-http = { path = "../crusty-http" }
 crusty-store = { path = "../crusty-store" }
+crusty-auth = { path = "../crusty-auth" }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 tokio = { workspace = true }
@@ -21,3 +22,4 @@ serde_json = { workspace = true }
 miette = { workspace = true }
 uuid = { workspace = true }
 url = { workspace = true }
+chrono = { workspace = true }
