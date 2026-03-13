@@ -5,6 +5,7 @@
 //! Supports cURL import/export, with more formats planned
 //! (Postman, Insomnia, OpenAPI, HAR).
 
+pub mod codegen;
 pub mod curl;
 mod error;
 
