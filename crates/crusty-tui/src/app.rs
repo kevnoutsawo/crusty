@@ -24,6 +24,8 @@ pub enum FocusedPane {
     ResponseBody,
     /// Key-value editor (headers/params).
     KeyValueEditor,
+    /// Send button.
+    SendButton,
 }
 
 /// Which tab is active in the request section.
@@ -284,6 +286,8 @@ pub struct App {
     pub test_result_scroll: usize,
     /// Script logs from the last run.
     pub script_logs: Vec<String>,
+    /// Whether a send was requested (set by Enter in URL bar or Send button).
+    pub send_requested: bool,
 }
 
 impl App {
@@ -365,6 +369,7 @@ impl App {
             test_collection_index: 0,
             test_result_scroll: 0,
             script_logs: Vec::new(),
+            send_requested: false,
         }
     }
 

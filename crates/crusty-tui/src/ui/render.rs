@@ -326,20 +326,23 @@ fn render_url_bar(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     // Send button
+    let send_focused = app.focus == FocusedPane::SendButton;
     let send_style = if app.loading {
         Style::default().fg(BG_PRIMARY).bg(STATUS_WARNING)
+    } else if send_focused {
+        Style::default().fg(BG_PRIMARY).bg(STATUS_SUCCESS).bold()
     } else {
         Style::default().fg(BG_PRIMARY).bg(ACCENT_BLUE).bold()
     };
     let send_text = if app.loading { " Sending " } else { "  Send  " };
-    let send_idx = if has_env { 3 } else { 3 };
+    let send_border = if send_focused { STATUS_SUCCESS } else { ACCENT_BLUE };
     let send_block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(ACCENT_BLUE))
+        .border_style(Style::default().fg(send_border))
         .style(Style::default().bg(BG_SURFACE));
     frame.render_widget(
         Paragraph::new(send_text).style(send_style).block(send_block),
-        chunks[send_idx],
+        chunks[3],
     );
 }
 
@@ -784,6 +787,8 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         "Tab/Enter: Next field │ Esc: Stop editing".to_string()
     } else if app.focus == FocusedPane::KeyValueEditor {
         "a: Add │ d: Delete │ Space: Toggle │ e/Enter: Edit │ Tab: Next pane".to_string()
+    } else if app.focus == FocusedPane::SendButton {
+        "Enter/Space: Send request │ Tab: Next pane │ Esc: Response".to_string()
     } else {
         let env_hint = if !app.environments.is_empty() {
             " │ Ctrl+E: Switch env"
@@ -791,7 +796,7 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             ""
         };
         format!(
-            "Tab: Switch pane │ Ctrl+Enter: Send │ Ctrl+I: Import cURL │ Ctrl+G: Code gen │ ?: Help{env_hint} │ q: Quit"
+            "Tab: Switch pane │ Enter: Send │ Ctrl+R: Send │ Ctrl+I: Import cURL │ Ctrl+G: Code gen │ ?: Help{env_hint} │ q: Quit"
         )
     };
 
@@ -811,7 +816,7 @@ fn render_help_overlay(frame: &mut Frame, area: Rect) {
         .style(Style::default().bg(BG_ELEVATED));
 
     let shortcuts = vec![
-        ("Ctrl+Enter / Ctrl+R", "Send request"),
+        ("Enter / Ctrl+R", "Send request"),
         ("Tab / Shift+Tab", "Cycle panes"),
         ("Ctrl+B", "Toggle sidebar"),
         ("Ctrl+E", "Switch environment"),

@@ -51,13 +51,12 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> miette::R
                     continue;
                 }
 
-                // Send request: Ctrl+Enter or Ctrl+R (not while editing)
+                // Send request: Ctrl+R (not while editing)
                 let is_editing = app.kv_mode != KvEditMode::Navigate || app.auth_editing;
                 let should_send = !is_editing
                     && matches!(
                         (key.modifiers, key.code),
-                        (KeyModifiers::CONTROL, KeyCode::Enter)
-                            | (KeyModifiers::CONTROL, KeyCode::Char('r'))
+                        (KeyModifiers::CONTROL, KeyCode::Char('r'))
                     );
 
                 if should_send && !app.loading && !app.url_input.trim().is_empty() {
@@ -67,6 +66,14 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> miette::R
 
                 if !handle_key_event(&mut app, key) {
                     break;
+                }
+
+                // Handle deferred send (from Enter in URL bar or Send button)
+                if app.send_requested {
+                    app.send_requested = false;
+                    if !app.loading && !app.url_input.trim().is_empty() {
+                        send_request(&mut app).await;
+                    }
                 }
             }
         }
@@ -210,6 +217,7 @@ fn handle_key_event(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         FocusedPane::ResponseBody => handle_response(app, key),
         FocusedPane::Sidebar => handle_sidebar(app, key),
         FocusedPane::KeyValueEditor => handle_kv_navigate(app, key),
+        FocusedPane::SendButton => handle_send_button(app, key),
         _ => handle_fallback(app, key),
     }
 }
@@ -235,6 +243,12 @@ fn handle_url_input(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         (_, KeyCode::Right) => app.url_cursor = (app.url_cursor + 1).min(app.url_input.len()),
         (_, KeyCode::Home) => app.url_cursor = 0,
         (_, KeyCode::End) => app.url_cursor = app.url_input.len(),
+        (_, KeyCode::Enter) => {
+            // Enter in URL bar sends the request
+            if !app.url_input.trim().is_empty() {
+                app.send_requested = true;
+            }
+        }
         (_, KeyCode::Tab) => {
             // Tab into the request pane's key-value editor, body editor, or script editor
             if matches!(app.request_tab, RequestTab::Params | RequestTab::Headers) {
@@ -251,6 +265,25 @@ fn handle_url_input(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
             }
         }
         (_, KeyCode::Esc) => app.focus = FocusedPane::ResponseBody,
+        _ => {}
+    }
+    // Return a special marker — Enter in URL bar should send
+    URL_INPUT_RESULT
+}
+
+/// Marker constant — always true (URL input never quits).
+const URL_INPUT_RESULT: bool = true;
+
+fn handle_send_button(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
+    match key.code {
+        KeyCode::Enter | KeyCode::Char(' ') => {
+            // Will be caught by the async send logic below — set a flag
+            app.send_requested = true;
+        }
+        KeyCode::Tab => app.focus = FocusedPane::ResponseBody,
+        KeyCode::BackTab => app.focus = FocusedPane::UrlBar,
+        KeyCode::Esc => app.focus = FocusedPane::ResponseBody,
+        KeyCode::Char('q') => return false,
         _ => {}
     }
     true
@@ -275,7 +308,7 @@ fn handle_response(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
                 FocusedPane::UrlBar
             };
         }
-        KeyCode::BackTab => app.focus = FocusedPane::UrlBar,
+        KeyCode::BackTab => app.focus = FocusedPane::SendButton,
         KeyCode::Char('1') => app.request_tab = RequestTab::Params,
         KeyCode::Char('2') => app.request_tab = RequestTab::Headers,
         KeyCode::Char('3') => app.request_tab = RequestTab::Body,
