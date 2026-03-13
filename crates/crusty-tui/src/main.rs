@@ -3,7 +3,7 @@
 mod app;
 mod ui;
 
-use app::{App, AuthType, FocusedPane, KvEditMode, RequestTab, ResponseTab};
+use app::{App, AuthType, FocusedPane, KvEditMode, RequestTab, ResponseTab, SidebarItem};
 use crossterm::event::{self as ct_event, Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
 use crossterm::ExecutableCommand;
@@ -33,6 +33,7 @@ async fn main() -> miette::Result<()> {
 async fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> miette::Result<()> {
     let mut app = App::new();
     app.load_history();
+    app.load_collections();
 
     loop {
         terminal
@@ -89,6 +90,11 @@ fn handle_key_event(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         return handle_codegen(app, key);
     }
 
+    // Save dialog
+    if app.save_dialog_open {
+        return handle_save_dialog(app, key);
+    }
+
     // If editing a key-value field, handle that first
     if app.kv_mode != KvEditMode::Navigate {
         return handle_kv_edit(app, key);
@@ -117,6 +123,20 @@ fn handle_key_event(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('g') {
         app.codegen_open = true;
         app.codegen_lang_index = 0;
+        return true;
+    }
+
+    // Global: Ctrl+S saves request to collection
+    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('s') {
+        app.save_dialog_open = true;
+        app.save_name_buf = if app.url_input.is_empty() {
+            "New Request".to_string()
+        } else {
+            app.url_input.clone()
+        };
+        app.save_name_cursor = app.save_name_buf.len();
+        app.save_collection_index = 0;
+        app.save_editing_name = true;
         return true;
     }
 
@@ -240,9 +260,57 @@ fn handle_response(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
 }
 
 fn handle_sidebar(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
+    let items = app.sidebar_items();
+    let item_count = items.len();
+
     match key.code {
         KeyCode::Char('q') => return false,
         KeyCode::Tab => app.focus = FocusedPane::UrlBar,
+        KeyCode::Char('j') | KeyCode::Down => {
+            if item_count > 0 {
+                app.sidebar_selected = (app.sidebar_selected + 1).min(item_count - 1);
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.sidebar_selected = app.sidebar_selected.saturating_sub(1);
+        }
+        KeyCode::Enter | KeyCode::Char('l') => {
+            if let Some(item) = items.get(app.sidebar_selected) {
+                match item {
+                    SidebarItem::Collection { index, .. } => {
+                        let idx = *index;
+                        if idx < app.sidebar_expanded.len() {
+                            app.sidebar_expanded[idx] = !app.sidebar_expanded[idx];
+                        }
+                    }
+                    SidebarItem::Request { collection_index, request_id, .. } => {
+                        let ci = *collection_index;
+                        let rid = *request_id;
+                        app.load_request(ci, rid);
+                        app.focus = FocusedPane::UrlBar;
+                    }
+                }
+            }
+        }
+        KeyCode::Char('h') => {
+            // Collapse current collection
+            if let Some(item) = items.get(app.sidebar_selected) {
+                match item {
+                    SidebarItem::Collection { index, .. } => {
+                        let idx = *index;
+                        if idx < app.sidebar_expanded.len() {
+                            app.sidebar_expanded[idx] = false;
+                        }
+                    }
+                    SidebarItem::Request { collection_index, .. } => {
+                        let ci = *collection_index;
+                        if ci < app.sidebar_expanded.len() {
+                            app.sidebar_expanded[ci] = false;
+                        }
+                    }
+                }
+            }
+        }
         _ => {}
     }
     true
@@ -532,6 +600,64 @@ fn handle_codegen(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         }
         KeyCode::Esc | KeyCode::Char('q') => app.codegen_open = false,
         _ => {}
+    }
+    true
+}
+
+// --- Save Dialog ---
+
+fn handle_save_dialog(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
+    if app.save_editing_name {
+        match key.code {
+            KeyCode::Char(c) => {
+                app.save_name_buf.insert(app.save_name_cursor, c);
+                app.save_name_cursor += 1;
+            }
+            KeyCode::Backspace => {
+                if app.save_name_cursor > 0 {
+                    app.save_name_cursor -= 1;
+                    app.save_name_buf.remove(app.save_name_cursor);
+                }
+            }
+            KeyCode::Left => app.save_name_cursor = app.save_name_cursor.saturating_sub(1),
+            KeyCode::Right => {
+                app.save_name_cursor =
+                    (app.save_name_cursor + 1).min(app.save_name_buf.len())
+            }
+            KeyCode::Tab => {
+                // Switch to collection selection if there are collections
+                if !app.collections.is_empty() {
+                    app.save_editing_name = false;
+                }
+            }
+            KeyCode::Enter => {
+                // Save
+                let name = app.save_name_buf.clone();
+                let idx = app.save_collection_index;
+                app.save_request_to_collection(&name, idx);
+                app.save_dialog_open = false;
+            }
+            KeyCode::Esc => app.save_dialog_open = false,
+            _ => {}
+        }
+    } else {
+        // Selecting collection
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                if !app.collections.is_empty() {
+                    app.save_collection_index =
+                        (app.save_collection_index + 1).min(app.collections.len() - 1);
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                app.save_collection_index = app.save_collection_index.saturating_sub(1);
+            }
+            KeyCode::Tab | KeyCode::Enter => {
+                app.save_editing_name = true;
+            }
+            KeyCode::Esc => app.save_dialog_open = false,
+            _ => {}
+        }
     }
     true
 }

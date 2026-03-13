@@ -1,7 +1,7 @@
 //! Application state for the Crusty TUI.
 
 use crusty_auth::{ApiKeyLocation, AuthConfig, AuthProvider};
-use crusty_core::collection::Collection;
+use crusty_core::collection::{Collection, CollectionItem};
 use crusty_core::environment::Environment;
 use crusty_core::request::{HttpMethod, KeyValue, RequestBody, RequestDefinition};
 use crusty_core::response::HttpResponse;
@@ -89,6 +89,29 @@ impl AuthType {
             Self::ApiKey => "API Key",
         }
     }
+}
+
+/// An item in the sidebar's flat list.
+#[derive(Debug, Clone)]
+pub enum SidebarItem {
+    /// A collection header.
+    Collection {
+        /// Index in the collections list.
+        index: usize,
+        /// Collection name.
+        name: String,
+    },
+    /// A request within a collection.
+    Request {
+        /// Parent collection index.
+        collection_index: usize,
+        /// Request ID.
+        request_id: uuid::Uuid,
+        /// HTTP method string.
+        method: String,
+        /// Request name.
+        name: String,
+    },
 }
 
 /// The main application state.
@@ -181,6 +204,10 @@ pub struct App {
     pub collections: Vec<Collection>,
     /// Whether the sidebar is visible.
     pub sidebar_visible: bool,
+    /// Selected index in the sidebar (flat list of collections + requests).
+    pub sidebar_selected: usize,
+    /// Expanded collection indices (which collections are expanded).
+    pub sidebar_expanded: Vec<bool>,
     /// Whether to show help overlay.
     pub show_help: bool,
 
@@ -198,6 +225,17 @@ pub struct App {
     pub codegen_open: bool,
     /// Selected language index for code generation.
     pub codegen_lang_index: usize,
+
+    /// Whether the save-to-collection dialog is open.
+    pub save_dialog_open: bool,
+    /// Buffer for request name when saving.
+    pub save_name_buf: String,
+    /// Cursor position in save name buffer.
+    pub save_name_cursor: usize,
+    /// Which collection to save to (index).
+    pub save_collection_index: usize,
+    /// Whether we're editing the name (true) or selecting collection (false).
+    pub save_editing_name: bool,
 }
 
 impl App {
@@ -245,6 +283,8 @@ impl App {
             store,
             collections: Vec::new(),
             sidebar_visible: true,
+            sidebar_selected: 0,
+            sidebar_expanded: Vec::new(),
             show_help: false,
             curl_import_open: false,
             curl_import_buf: String::new(),
@@ -252,6 +292,11 @@ impl App {
             curl_import_error: None,
             codegen_open: false,
             codegen_lang_index: 0,
+            save_dialog_open: false,
+            save_name_buf: String::new(),
+            save_name_cursor: 0,
+            save_collection_index: 0,
+            save_editing_name: true,
         }
     }
 
@@ -360,6 +405,84 @@ impl App {
         }
 
         Ok(resolved)
+    }
+
+    /// Load collections from the store.
+    pub fn load_collections(&mut self) {
+        if let Some(ref store) = self.store {
+            if let Ok(col_list) = store.list_collections() {
+                let mut cols = Vec::new();
+                for (id, _name) in &col_list {
+                    if let Ok(col) = store.get_collection(id) {
+                        cols.push(col);
+                    }
+                }
+                self.collections = cols;
+                self.sidebar_expanded = vec![false; self.collections.len()];
+            }
+        }
+    }
+
+    /// Save the current request to a collection.
+    pub fn save_request_to_collection(&mut self, name: &str, collection_index: usize) {
+        let def = self.build_request_definition();
+        let mut save_def = def;
+        save_def.name = name.to_string();
+
+        if self.collections.is_empty() {
+            // Create a default collection
+            let mut col = Collection::new("Default");
+            col.add_request(save_def);
+            if let Some(ref store) = self.store {
+                let _ = store.save_collection(&col);
+            }
+            self.collections.push(col);
+            self.sidebar_expanded.push(true);
+        } else if let Some(col) = self.collections.get_mut(collection_index) {
+            col.add_request(save_def);
+            if let Some(ref store) = self.store {
+                let _ = store.save_collection(col);
+            }
+        }
+    }
+
+    /// Get a flat list of sidebar items for rendering: (indent_level, label, is_collection, collection_idx, option request).
+    pub fn sidebar_items(&self) -> Vec<SidebarItem> {
+        let mut items = Vec::new();
+        for (ci, col) in self.collections.iter().enumerate() {
+            items.push(SidebarItem::Collection { index: ci, name: col.name.clone() });
+            if ci < self.sidebar_expanded.len() && self.sidebar_expanded[ci] {
+                for item in &col.items {
+                    if let CollectionItem::Request(req) = item {
+                        items.push(SidebarItem::Request {
+                            collection_index: ci,
+                            request_id: req.id,
+                            method: req.method.as_str().to_string(),
+                            name: req.name.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        items
+    }
+
+    /// Load a request from a collection into the editor.
+    pub fn load_request(&mut self, collection_index: usize, request_id: uuid::Uuid) {
+        if let Some(col) = self.collections.get(collection_index) {
+            if let Some(req) = col.find_request(&request_id) {
+                self.url_input = req.url.clone();
+                self.url_cursor = self.url_input.len();
+                self.method = req.method;
+                self.headers = req.headers.clone();
+                self.params = req.params.clone();
+                match &req.body {
+                    RequestBody::Json(json) => self.body_input = json.clone(),
+                    RequestBody::Raw { content, .. } => self.body_input = content.clone(),
+                    _ => self.body_input.clear(),
+                }
+            }
+        }
     }
 
     /// Build a RequestDefinition from current state (for export/codegen).

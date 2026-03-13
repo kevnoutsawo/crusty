@@ -1,6 +1,6 @@
 //! Main render function for the TUI layout.
 
-use crate::app::{App, AuthType, FocusedPane, KvEditMode, RequestTab, ResponseTab};
+use crate::app::{App, AuthType, FocusedPane, KvEditMode, RequestTab, ResponseTab, SidebarItem};
 use crusty_core::response::{HttpResponse, StatusCategory};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style, Stylize};
@@ -40,6 +40,11 @@ pub fn render(frame: &mut Frame, app: &App) {
 
     if app.codegen_open {
         render_codegen_overlay(frame, app, area);
+        return;
+    }
+
+    if app.save_dialog_open {
+        render_save_dialog(frame, app, area);
         return;
     }
 
@@ -97,18 +102,54 @@ fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
         .border_style(Style::default().fg(border_color))
         .style(Style::default().bg(BG_SURFACE));
 
-    if app.collections.is_empty() {
-        let empty = Paragraph::new("  No collections")
+    let sidebar_items = app.sidebar_items();
+    if sidebar_items.is_empty() {
+        let hint = if is_focused {
+            "  No collections\n  Ctrl+S to save a request"
+        } else {
+            "  No collections"
+        };
+        let empty = Paragraph::new(hint)
             .style(Style::default().fg(TEXT_SECONDARY))
             .block(col_block);
         frame.render_widget(empty, chunks[0]);
     } else {
-        let items: Vec<ListItem> = app
-            .collections
+        let items: Vec<ListItem> = sidebar_items
             .iter()
-            .map(|c| {
-                ListItem::new(format!("  {} {}", "▸", c.name))
-                    .style(Style::default().fg(TEXT_PRIMARY))
+            .enumerate()
+            .map(|(i, item)| {
+                let is_selected = is_focused && i == app.sidebar_selected;
+                match item {
+                    SidebarItem::Collection { index, name } => {
+                        let expanded = *index < app.sidebar_expanded.len()
+                            && app.sidebar_expanded[*index];
+                        let arrow = if expanded { "▾" } else { "▸" };
+                        let style = if is_selected {
+                            Style::default().fg(ACCENT_BLUE).add_modifier(Modifier::BOLD)
+                        } else {
+                            Style::default().fg(TEXT_PRIMARY).add_modifier(Modifier::BOLD)
+                        };
+                        ListItem::new(format!(" {arrow} {name}")).style(style)
+                    }
+                    SidebarItem::Request { method, name, .. } => {
+                        let style = if is_selected {
+                            Style::default().fg(TEXT_PRIMARY).add_modifier(Modifier::REVERSED)
+                        } else {
+                            Style::default().fg(TEXT_SECONDARY)
+                        };
+                        ListItem::new(Line::from(vec![
+                            Span::styled("   ", Style::default()),
+                            Span::styled(
+                                format!("{:>4} ", method),
+                                method_color_str(method),
+                            ),
+                            Span::styled(
+                                truncate_url(name, 16),
+                                style,
+                            ),
+                        ]))
+                    }
+                }
             })
             .collect();
         let list = List::new(items).block(col_block);
@@ -835,6 +876,105 @@ fn render_curl_import_overlay(frame: &mut Frame, app: &App, area: Rect) {
             chunks[2],
         );
     }
+}
+
+fn render_save_dialog(frame: &mut Frame, app: &App, area: Rect) {
+    let popup = centered_rect(50, 40, area);
+
+    frame.render_widget(
+        Block::default().style(Style::default().bg(BG_PRIMARY)),
+        area,
+    );
+
+    let block = Block::default()
+        .title(" Save Request to Collection ")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ACCENT_BLUE))
+        .style(Style::default().bg(BG_ELEVATED));
+
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // Label
+            Constraint::Length(3), // Name input
+            Constraint::Length(1), // Label
+            Constraint::Min(3),   // Collection list
+            Constraint::Length(1), // Hints
+        ])
+        .split(inner);
+
+    // Name label
+    frame.render_widget(
+        Paragraph::new("  Request name:")
+            .style(Style::default().fg(TEXT_SECONDARY)),
+        chunks[0],
+    );
+
+    // Name input
+    let name_border = if app.save_editing_name { ACCENT_BLUE } else { BORDER };
+    let name_block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(name_border))
+        .style(Style::default().bg(BG_SURFACE));
+
+    frame.render_widget(
+        Paragraph::new(app.save_name_buf.as_str())
+            .style(Style::default().fg(TEXT_PRIMARY))
+            .block(name_block),
+        chunks[1],
+    );
+
+    if app.save_editing_name {
+        let cx = chunks[1].x + 1 + app.save_name_cursor as u16;
+        let cy = chunks[1].y + 1;
+        frame.set_cursor_position((cx.min(chunks[1].x + chunks[1].width - 2), cy));
+    }
+
+    // Collection label
+    let col_label = if app.collections.is_empty() {
+        "  Will create 'Default' collection"
+    } else {
+        "  Save to collection:"
+    };
+    frame.render_widget(
+        Paragraph::new(col_label).style(Style::default().fg(TEXT_SECONDARY)),
+        chunks[2],
+    );
+
+    // Collection list
+    if !app.collections.is_empty() {
+        let items: Vec<ListItem> = app
+            .collections
+            .iter()
+            .enumerate()
+            .map(|(i, col)| {
+                let is_selected = !app.save_editing_name && i == app.save_collection_index;
+                let style = if is_selected {
+                    Style::default().fg(ACCENT_BLUE).add_modifier(Modifier::REVERSED)
+                } else {
+                    Style::default().fg(TEXT_PRIMARY)
+                };
+                ListItem::new(format!("  {} ({})", col.name, col.request_count())).style(style)
+            })
+            .collect();
+
+        let list_block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(if app.save_editing_name { BORDER } else { ACCENT_BLUE }))
+            .style(Style::default().bg(BG_SURFACE));
+
+        frame.render_widget(List::new(items).block(list_block), chunks[3]);
+    }
+
+    // Hints
+    frame.render_widget(
+        Paragraph::new("  Enter: Save │ Tab: Switch field │ Esc: Cancel")
+            .style(Style::default().fg(TEXT_SECONDARY)),
+        chunks[4],
+    );
 }
 
 fn render_codegen_overlay(frame: &mut Frame, app: &App, area: Rect) {
