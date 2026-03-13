@@ -9,5 +9,13 @@ description = "Proxy interception and MITM-style request capture for Crusty"
 crusty-core = { path = "../crusty-core" }
 async-trait = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+http-body-util = { workspace = true }
+chrono = { workspace = true }
+bytes = "1"
+uuid = { workspace = true }
+reqwest = { workspace = true }
