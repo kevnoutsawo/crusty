@@ -42,7 +42,7 @@ http = "1"
 rusqlite = { version = "0.39", features = ["bundled"] }
 
 # TUI
-ratatui = "0.29"
+ratatui = "0.30"
 crossterm = "0.29"
 
 # WebSocket

@@ -3,7 +3,7 @@
 use crate::app::{App, AuthType, FocusedPane, KvEditMode, RequestTab, ResponseTab, SidebarItem};
 use crusty_core::response::{HttpResponse, StatusCategory};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style, Stylize};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Wrap};
 use ratatui::Frame;
