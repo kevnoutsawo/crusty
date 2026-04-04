@@ -119,10 +119,7 @@ fn gen_python(def: &RequestDefinition) -> String {
     }
 
     // Body
-    let has_body = matches!(
-        &def.body,
-        RequestBody::Json(_) | RequestBody::Raw { .. }
-    );
+    let has_body = matches!(&def.body, RequestBody::Json(_) | RequestBody::Raw { .. });
     if has_body {
         match &def.body {
             RequestBody::Json(json) => {
@@ -156,7 +153,10 @@ fn gen_javascript(def: &RequestDefinition) -> String {
     // Headers
     let enabled_headers: Vec<&KeyValue> = def.headers.iter().filter(|h| h.enabled).collect();
 
-    code.push_str(&format!("const response = await fetch(\"{}\", {{\n", def.url));
+    code.push_str(&format!(
+        "const response = await fetch(\"{}\", {{\n",
+        def.url
+    ));
     code.push_str(&format!("  method: \"{}\",\n", def.method.as_str()));
 
     if !enabled_headers.is_empty() {
@@ -173,10 +173,7 @@ fn gen_javascript(def: &RequestDefinition) -> String {
 
     match &def.body {
         RequestBody::Json(json) => {
-            code.push_str(&format!(
-                "  body: JSON.stringify({}),\n",
-                json
-            ));
+            code.push_str(&format!("  body: JSON.stringify({}),\n", json));
         }
         RequestBody::Raw { content, .. } => {
             code.push_str(&format!("  body: \"{}\",\n", escape_str(content)));
@@ -198,10 +195,7 @@ fn gen_go(def: &RequestDefinition) -> String {
     code.push_str("    \"io\"\n");
     code.push_str("    \"net/http\"\n");
 
-    let has_body = matches!(
-        &def.body,
-        RequestBody::Json(_) | RequestBody::Raw { .. }
-    );
+    let has_body = matches!(&def.body, RequestBody::Json(_) | RequestBody::Raw { .. });
     if has_body {
         code.push_str("    \"strings\"\n");
     }
@@ -215,10 +209,7 @@ fn gen_go(def: &RequestDefinition) -> String {
             RequestBody::Raw { content, .. } => content.clone(),
             _ => String::new(),
         };
-        code.push_str(&format!(
-            "    body := strings.NewReader(`{}`)\n",
-            body_str
-        ));
+        code.push_str(&format!("    body := strings.NewReader(`{}`)\n", body_str));
         code.push_str(&format!(
             "    req, err := http.NewRequest(\"{}\", \"{}\", body)\n",
             def.method.as_str(),
@@ -289,7 +280,8 @@ mod tests {
     fn test_gen_rust() {
         let mut def = RequestDefinition::new("Test", "https://api.example.com");
         def.method = HttpMethod::Post;
-        def.headers.push(KeyValue::new("Content-Type", "application/json"));
+        def.headers
+            .push(KeyValue::new("Content-Type", "application/json"));
         def.body = RequestBody::Json(r#"{"key":"value"}"#.to_string());
 
         let code = generate(&def, Language::Rust);

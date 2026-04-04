@@ -82,7 +82,7 @@ fn rand_u32() -> u32 {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
     // Use nanoseconds for some variation
-    (now.subsec_nanos() ^ 0xDEAD_BEEF) .wrapping_mul(2654435761)
+    (now.subsec_nanos() ^ 0xDEAD_BEEF).wrapping_mul(2654435761)
 }
 
 #[cfg(test)]

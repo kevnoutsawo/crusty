@@ -40,7 +40,9 @@ impl ScriptEngine {
 
         let vars_set = Rc::clone(&variables);
         engine.register_fn("set_variable", move |key: &str, value: &str| {
-            vars_set.borrow_mut().insert(key.to_string(), value.to_string());
+            vars_set
+                .borrow_mut()
+                .insert(key.to_string(), value.to_string());
         });
 
         let vars_get = Rc::clone(&variables);
@@ -94,7 +96,9 @@ impl ScriptEngine {
 
         let vars_set = Rc::clone(&variables);
         engine.register_fn("set_variable", move |key: &str, value: &str| {
-            vars_set.borrow_mut().insert(key.to_string(), value.to_string());
+            vars_set
+                .borrow_mut()
+                .insert(key.to_string(), value.to_string());
         });
 
         let vars_get = Rc::clone(&variables);
@@ -231,9 +235,10 @@ mod tests {
             method: "GET".to_string(),
             status: 200,
             status_text: "OK".to_string(),
-            response_headers: HashMap::from([
-                ("content-type".to_string(), "application/json".to_string()),
-            ]),
+            response_headers: HashMap::from([(
+                "content-type".to_string(),
+                "application/json".to_string(),
+            )]),
             response_body: r#"{"users":[{"id":1,"name":"Alice"}]}"#.to_string(),
             response_time_ms: 150,
             variables: HashMap::new(),
@@ -257,10 +262,7 @@ mod tests {
         let engine = ScriptEngine::new();
         let ctx = default_pre_ctx();
         let result = engine
-            .run_pre_request(
-                r#"let val = get_variable("token"); log(val);"#,
-                &ctx,
-            )
+            .run_pre_request(r#"let val = get_variable("token"); log(val);"#, &ctx)
             .unwrap();
         assert_eq!(result.logs, vec!["abc123"]);
     }
@@ -321,10 +323,7 @@ mod tests {
         let engine = ScriptEngine::new();
         let ctx = default_post_ctx();
         let result = engine
-            .run_post_request(
-                r#"test("Fast response", response_time < 500);"#,
-                &ctx,
-            )
+            .run_post_request(r#"test("Fast response", response_time < 500);"#, &ctx)
             .unwrap();
         assert!(result.all_passed);
     }

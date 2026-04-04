@@ -8,8 +8,10 @@ use std::collections::HashMap;
 /// Configuration for request authentication.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
+#[derive(Default)]
 pub enum AuthConfig {
     /// No authentication.
+    #[default]
     None,
     /// Bearer token authentication.
     Bearer {
@@ -32,12 +34,6 @@ pub enum AuthConfig {
         /// Where to send the API key.
         location: ApiKeyLocation,
     },
-}
-
-impl Default for AuthConfig {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// Where an API key should be sent.

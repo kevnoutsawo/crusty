@@ -7,6 +7,18 @@ description = "Test runner, assertions, and CI mode for Crusty"
 
 [dependencies]
 crusty-core = { path = "../crusty-core" }
+crusty-http = { path = "../crusty-http" }
+crusty-scripting = { path = "../crusty-scripting" }
 async-trait = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+regex = { workspace = true }
+
+[dev-dependencies]
+crusty-mock = { path = "../crusty-mock" }
+
+[lints]
+workspace = true

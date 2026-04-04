@@ -42,12 +42,12 @@ impl Environment {
         self.variables
             .iter()
             .filter(|v| v.enabled)
-            .filter_map(|v| {
+            .map(|v| {
                 let value = match &v.value {
                     VariableValue::Plain(s) => s.clone(),
-                    VariableValue::Secret(_) => return Some((v.key.clone(), v.value.reveal().to_string())),
+                    VariableValue::Secret(_) => v.value.reveal().to_string(),
                 };
-                Some((v.key.clone(), value))
+                (v.key.clone(), value)
             })
             .collect()
     }

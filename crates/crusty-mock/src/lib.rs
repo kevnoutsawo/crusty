@@ -5,8 +5,8 @@
 //! Create mock HTTP endpoints with configurable responses,
 //! request matching, and delay simulation.
 
-mod error;
 pub mod endpoint;
+mod error;
 pub mod server;
 
 pub use error::MockError;

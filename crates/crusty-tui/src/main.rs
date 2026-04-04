@@ -5,7 +5,9 @@ mod ui;
 
 use app::{App, AuthType, FocusedPane, KvEditMode, RequestTab, ResponseTab, SidebarItem};
 use crossterm::event::{self as ct_event, Event, KeyCode, KeyEventKind, KeyModifiers};
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
 use crossterm::ExecutableCommand;
 use crusty_core::request::KeyValue;
 use ratatui::prelude::*;
@@ -44,8 +46,8 @@ async fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> miette::R
         if ct_event::poll(Duration::from_millis(50))
             .map_err(|e| miette::miette!("Event poll error: {e}"))?
         {
-            if let Event::Key(key) = ct_event::read()
-                .map_err(|e| miette::miette!("Event read error: {e}"))?
+            if let Event::Key(key) =
+                ct_event::read().map_err(|e| miette::miette!("Event read error: {e}"))?
             {
                 if key.kind != KeyEventKind::Press {
                     continue;
@@ -357,7 +359,13 @@ fn handle_sidebar(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
 
     match key.code {
         KeyCode::Char('q') => return false,
-        KeyCode::Tab => app.focus = FocusedPane::UrlBar,
+        KeyCode::Tab => {
+            if app.sidebar_section == 0 {
+                app.sidebar_section = 1; // Collections → History
+            } else {
+                app.focus = FocusedPane::UrlBar; // History → leave sidebar
+            }
+        }
         // Switch between collections and history sections
         KeyCode::Char('1') => {
             app.sidebar_section = 0;
@@ -405,7 +413,11 @@ fn handle_sidebar(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
                                 app.sidebar_expanded[idx] = !app.sidebar_expanded[idx];
                             }
                         }
-                        SidebarItem::Request { collection_index, request_id, .. } => {
+                        SidebarItem::Request {
+                            collection_index,
+                            request_id,
+                            ..
+                        } => {
                             let ci = *collection_index;
                             let rid = *request_id;
                             app.load_request(ci, rid);
@@ -430,7 +442,9 @@ fn handle_sidebar(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
                                 app.sidebar_expanded[idx] = false;
                             }
                         }
-                        SidebarItem::Request { collection_index, .. } => {
+                        SidebarItem::Request {
+                            collection_index, ..
+                        } => {
                             let ci = *collection_index;
                             if ci < app.sidebar_expanded.len() {
                                 app.sidebar_expanded[ci] = false;
@@ -594,7 +608,9 @@ fn handle_auth_edit(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
 
     match key.code {
         KeyCode::Char(c) => field.push(c),
-        KeyCode::Backspace => { field.pop(); }
+        KeyCode::Backspace => {
+            field.pop();
+        }
         KeyCode::Tab | KeyCode::Enter => {
             app.auth_editing = false;
             app.auth_field_index = (app.auth_field_index + 1) % auth_field_count(app.auth_type);
@@ -696,21 +712,19 @@ fn handle_curl_import(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         }
         KeyCode::Left => app.curl_import_cursor = app.curl_import_cursor.saturating_sub(1),
         KeyCode::Right => {
-            app.curl_import_cursor = (app.curl_import_cursor + 1).min(app.curl_import_buf.len())
+            app.curl_import_cursor = (app.curl_import_cursor + 1).min(app.curl_import_buf.len());
         }
         KeyCode::Home => app.curl_import_cursor = 0,
         KeyCode::End => app.curl_import_cursor = app.curl_import_buf.len(),
-        KeyCode::Enter => {
-            match crusty_export::curl::import(&app.curl_import_buf) {
-                Ok(def) => {
-                    app.apply_curl_import(&def);
-                    app.curl_import_open = false;
-                }
-                Err(e) => {
-                    app.curl_import_error = Some(e.to_string());
-                }
+        KeyCode::Enter => match crusty_export::curl::import(&app.curl_import_buf) {
+            Ok(def) => {
+                app.apply_curl_import(&def);
+                app.curl_import_open = false;
             }
-        }
+            Err(e) => {
+                app.curl_import_error = Some(e.to_string());
+            }
+        },
         KeyCode::Esc => app.curl_import_open = false,
         _ => {}
     }
@@ -751,8 +765,7 @@ fn handle_save_dialog(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
             }
             KeyCode::Left => app.save_name_cursor = app.save_name_cursor.saturating_sub(1),
             KeyCode::Right => {
-                app.save_name_cursor =
-                    (app.save_name_cursor + 1).min(app.save_name_buf.len())
+                app.save_name_cursor = (app.save_name_cursor + 1).min(app.save_name_buf.len());
             }
             KeyCode::Tab => {
                 // Switch to collection selection if there are collections
@@ -799,7 +812,9 @@ fn handle_env_dialog(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
     if app.env_editing_name {
         match key.code {
             KeyCode::Char(c) => app.env_name_buf.push(c),
-            KeyCode::Backspace => { app.env_name_buf.pop(); }
+            KeyCode::Backspace => {
+                app.env_name_buf.pop();
+            }
             KeyCode::Enter | KeyCode::Esc => {
                 // Apply name
                 if let Some(env) = app.environments.get_mut(app.env_dialog_index) {
@@ -828,7 +843,7 @@ fn handle_env_dialog(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
             KeyCode::Left => app.env_var_edit_cursor = app.env_var_edit_cursor.saturating_sub(1),
             KeyCode::Right => {
                 app.env_var_edit_cursor =
-                    (app.env_var_edit_cursor + 1).min(app.env_var_edit_buf.len())
+                    (app.env_var_edit_cursor + 1).min(app.env_var_edit_buf.len());
             }
             KeyCode::Tab | KeyCode::Enter => {
                 // Save field and move to next
@@ -859,8 +874,7 @@ fn handle_env_dialog(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         KeyCode::Char('j') | KeyCode::Down => {
             if let Some(env) = app.environments.get(app.env_dialog_index) {
                 if !env.variables.is_empty() {
-                    app.env_var_selected =
-                        (app.env_var_selected + 1).min(env.variables.len() - 1);
+                    app.env_var_selected = (app.env_var_selected + 1).min(env.variables.len() - 1);
                 }
             }
         }
@@ -924,8 +938,7 @@ fn handle_env_dialog(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         KeyCode::Char('l') | KeyCode::Right => {
             // Next environment
             if !app.environments.is_empty() {
-                app.env_dialog_index =
-                    (app.env_dialog_index + 1) % app.environments.len();
+                app.env_dialog_index = (app.env_dialog_index + 1) % app.environments.len();
                 app.env_var_selected = 0;
                 app.env_name_buf = app.environments[app.env_dialog_index].name.clone();
             }

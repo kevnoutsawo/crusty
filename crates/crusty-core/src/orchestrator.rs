@@ -7,7 +7,7 @@
 use crate::environment::Environment;
 use crate::error::{CoreError, Result};
 use crate::interpolation;
-use crate::request::{ResolvedBody, ResolvedRequest, RequestBody, RequestDefinition};
+use crate::request::{RequestBody, RequestDefinition, ResolvedBody, ResolvedRequest};
 use std::collections::HashMap;
 
 /// Build a `ResolvedRequest` from a definition, environment layers, and optional auth.
@@ -36,11 +36,7 @@ pub fn resolve_request(
     })?;
 
     // Append enabled query params
-    let enabled_params: Vec<_> = definition
-        .params
-        .iter()
-        .filter(|p| p.enabled)
-        .collect();
+    let enabled_params: Vec<_> = definition.params.iter().filter(|p| p.enabled).collect();
 
     if !enabled_params.is_empty() {
         let mut query_pairs = url.query_pairs_mut();
@@ -187,10 +183,7 @@ mod tests {
             .push(KeyValue::new("Accept", "application/json"));
 
         let result = resolve_request(&def, &[], &HashMap::new()).unwrap();
-        assert_eq!(
-            result.headers.get("Accept").unwrap(),
-            "application/json"
-        );
+        assert_eq!(result.headers.get("Accept").unwrap(), "application/json");
     }
 
     #[test]

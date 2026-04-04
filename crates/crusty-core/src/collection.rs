@@ -97,7 +97,10 @@ impl Folder {
     }
 }
 
-fn find_request_in_items<'a>(items: &'a [CollectionItem], id: &Uuid) -> Option<&'a RequestDefinition> {
+fn find_request_in_items<'a>(
+    items: &'a [CollectionItem],
+    id: &Uuid,
+) -> Option<&'a RequestDefinition> {
     for item in items {
         match item {
             CollectionItem::Request(req) if &req.id == id => return Some(req),
@@ -145,8 +148,14 @@ mod tests {
     #[test]
     fn test_collection_add_and_count() {
         let mut col = Collection::new("My API");
-        col.add_request(RequestDefinition::new("Get Users", "https://api.example.com/users"));
-        col.add_request(RequestDefinition::new("Get Posts", "https://api.example.com/posts"));
+        col.add_request(RequestDefinition::new(
+            "Get Users",
+            "https://api.example.com/users",
+        ));
+        col.add_request(RequestDefinition::new(
+            "Get Posts",
+            "https://api.example.com/posts",
+        ));
 
         assert_eq!(col.request_count(), 2);
     }
@@ -156,15 +165,27 @@ mod tests {
         let mut col = Collection::new("My API");
 
         let mut folder = Folder::new("Auth");
-        folder.add_request(RequestDefinition::new("Login", "https://api.example.com/login"));
-        folder.add_request(RequestDefinition::new("Logout", "https://api.example.com/logout"));
+        folder.add_request(RequestDefinition::new(
+            "Login",
+            "https://api.example.com/login",
+        ));
+        folder.add_request(RequestDefinition::new(
+            "Logout",
+            "https://api.example.com/logout",
+        ));
 
         let mut subfolder = Folder::new("OAuth");
-        subfolder.add_request(RequestDefinition::new("Token", "https://api.example.com/token"));
+        subfolder.add_request(RequestDefinition::new(
+            "Token",
+            "https://api.example.com/token",
+        ));
         folder.add_folder(subfolder);
 
         col.add_folder(folder);
-        col.add_request(RequestDefinition::new("Health", "https://api.example.com/health"));
+        col.add_request(RequestDefinition::new(
+            "Health",
+            "https://api.example.com/health",
+        ));
 
         assert_eq!(col.request_count(), 4);
     }

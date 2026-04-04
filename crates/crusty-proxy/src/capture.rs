@@ -4,17 +4,17 @@
 //! to the actual server, and logs both request and response data.
 
 use crate::error::ProxyError;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
-use tokio::net::TcpListener;
+use http_body_util::Full;
 use hyper::body::Incoming;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
-use http_body_util::Full;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::{Arc, RwLock};
+use tokio::net::TcpListener;
 
 /// A captured HTTP transaction (request + response).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,8 +89,7 @@ impl CaptureProxy {
             .local_addr()
             .map_err(|e| ProxyError::Bind(e.to_string()))?;
 
-        let transactions: Arc<RwLock<Vec<CapturedTransaction>>> =
-            Arc::new(RwLock::new(Vec::new()));
+        let transactions: Arc<RwLock<Vec<CapturedTransaction>>> = Arc::new(RwLock::new(Vec::new()));
         let filters: Arc<RwLock<CaptureFilter>> = Arc::new(RwLock::new(CaptureFilter {
             max_body_size: 1024 * 1024, // 1MB default
             ..Default::default()

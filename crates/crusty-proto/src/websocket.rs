@@ -109,15 +109,12 @@ pub struct WsConnection {
 ///
 /// Returns a `WsConnection` handle with command/event channels.
 /// The actual I/O runs in a background tokio task.
-pub async fn connect(
-    url: &str,
-    headers: &[(String, String)],
-) -> Result<WsConnection, ProtoError> {
+pub async fn connect(url: &str, headers: &[(String, String)]) -> Result<WsConnection, ProtoError> {
     let parsed_url = url::Url::parse(url)?;
 
     // Build the request with custom headers
-    let mut request = tokio_tungstenite::tungstenite::http::Request::builder()
-        .uri(parsed_url.as_str());
+    let mut request =
+        tokio_tungstenite::tungstenite::http::Request::builder().uri(parsed_url.as_str());
 
     for (key, value) in headers {
         request = request.header(key.as_str(), value.as_str());
@@ -158,9 +155,7 @@ pub async fn connect(
                     }
                 }
                 Err(e) => {
-                    let _ = evt_tx_read
-                        .send(WsEvent::Error(e.to_string()))
-                        .await;
+                    let _ = evt_tx_read.send(WsEvent::Error(e.to_string())).await;
                     break;
                 }
             }
@@ -190,9 +185,7 @@ pub async fn connect(
 
             let mut writer = write_handle.lock().await;
             if let Err(e) = writer.send(ws_msg).await {
-                let _ = evt_tx_write
-                    .send(WsEvent::Error(e.to_string()))
-                    .await;
+                let _ = evt_tx_write.send(WsEvent::Error(e.to_string())).await;
                 break;
             }
 

@@ -116,7 +116,7 @@ fn convert_postman_item(item: &PostmanItem) -> CollectionItem {
         }
         CollectionItem::Folder(folder)
     } else if let Some(ref req) = item.request {
-        let mut def = RequestDefinition::new(&item.name, &postman_url_raw(req));
+        let mut def = RequestDefinition::new(&item.name, postman_url_raw(req));
         def.method = parse_method(&req.method);
         def.headers = req
             .header

@@ -81,9 +81,10 @@ impl MockEndpoint {
             },
             response: MockResponse {
                 status,
-                headers: HashMap::from([
-                    ("content-type".to_string(), "application/json".to_string()),
-                ]),
+                headers: HashMap::from([(
+                    "content-type".to_string(),
+                    "application/json".to_string(),
+                )]),
                 body: body.to_string(),
                 delay_ms: 0,
             },
@@ -93,7 +94,13 @@ impl MockEndpoint {
     }
 
     /// Check if this endpoint matches the given request.
-    pub fn matches(&self, method: &str, path: &str, headers: &HashMap<String, String>, body: &str) -> bool {
+    pub fn matches(
+        &self,
+        method: &str,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> bool {
         if !self.enabled {
             return false;
         }
@@ -192,7 +199,9 @@ mod tests {
     #[test]
     fn test_header_match() {
         let mut ep = MockEndpoint::new("test", "POST", "/api/data", 200, "ok");
-        ep.matcher.headers.insert("x-api-key".to_string(), "secret".to_string());
+        ep.matcher
+            .headers
+            .insert("x-api-key".to_string(), "secret".to_string());
         let mut headers = HashMap::new();
         assert!(!ep.matches("POST", "/api/data", &headers, ""));
         headers.insert("x-api-key".to_string(), "secret".to_string());
@@ -205,7 +214,12 @@ mod tests {
         ep.matcher.body_contains = Some("search_term".to_string());
         let headers = HashMap::new();
         assert!(!ep.matches("POST", "/api/data", &headers, "no match here"));
-        assert!(ep.matches("POST", "/api/data", &headers, "contains search_term in body"));
+        assert!(ep.matches(
+            "POST",
+            "/api/data",
+            &headers,
+            "contains search_term in body"
+        ));
     }
 
     #[test]

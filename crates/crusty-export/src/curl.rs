@@ -64,8 +64,8 @@ pub fn import(curl_cmd: &str) -> Result<RequestDefinition, ExportError> {
             "-k" | "--insecure" => {
                 def.settings.verify_ssl = false;
             }
-            "--compressed" | "-s" | "--silent" | "-S" | "--show-error" | "-L"
-            | "--location" | "-v" | "--verbose" => {
+            "--compressed" | "-s" | "--silent" | "-S" | "--show-error" | "-L" | "--location"
+            | "-v" | "--verbose" => {
                 // Ignored flags — common but don't affect the request definition
             }
             arg if arg.starts_with('-') => {
@@ -85,7 +85,9 @@ pub fn import(curl_cmd: &str) -> Result<RequestDefinition, ExportError> {
     }
 
     if def.url.is_empty() {
-        return Err(ExportError::CurlParse("no URL found in cURL command".into()));
+        return Err(ExportError::CurlParse(
+            "no URL found in cURL command".into(),
+        ));
     }
 
     Ok(def)
@@ -154,7 +156,10 @@ pub fn export(def: &RequestDefinition) -> String {
                 format!("{}?{}", def.url, param_str)
             };
             // Replace the URL we already added
-            if let Some(pos) = parts.iter().position(|p| p.contains(&def.url) || p.contains("://")) {
+            if let Some(pos) = parts
+                .iter()
+                .position(|p| p.contains(&def.url) || p.contains("://"))
+            {
                 parts[pos] = shell_quote(&url_with_params);
             }
         }
@@ -175,8 +180,8 @@ fn tokenize(input: &str) -> Result<Vec<String>, ExportError> {
         .lines()
         .map(|line| {
             let l = line.trim();
-            if l.ends_with('\\') {
-                &l[..l.len() - 1]
+            if let Some(stripped) = l.strip_suffix('\\') {
+                stripped
             } else {
                 l
             }

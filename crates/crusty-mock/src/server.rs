@@ -5,12 +5,12 @@
 
 use crate::endpoint::MockEndpoint;
 use crate::error::MockError;
+use http_body_util::Full;
 use hyper::body::Incoming;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
-use http_body_util::Full;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
@@ -135,7 +135,10 @@ impl MockServer {
 
     /// Get all logged requests.
     pub fn request_log(&self) -> Vec<LoggedRequest> {
-        self.request_log.read().map(|l| l.clone()).unwrap_or_default()
+        self.request_log
+            .read()
+            .map(|l| l.clone())
+            .unwrap_or_default()
     }
 
     /// Clear the request log.
@@ -177,14 +180,11 @@ async fn handle_request(
     let body = String::from_utf8_lossy(&body_bytes).to_string();
 
     // Find matching endpoint
-    let matched_endpoint = endpoints
-        .read()
-        .ok()
-        .and_then(|eps| {
-            eps.iter()
-                .find(|ep| ep.matches(&method, &path, &headers, &body))
-                .cloned()
-        });
+    let matched_endpoint = endpoints.read().ok().and_then(|eps| {
+        eps.iter()
+            .find(|ep| ep.matches(&method, &path, &headers, &body))
+            .cloned()
+    });
 
     // Log the request
     if let Ok(mut log) = request_log.write() {
@@ -211,10 +211,10 @@ async fn handle_request(
                 response = response.header(key.as_str(), value.as_str());
             }
             Ok(response
-                .body(Full::new(bytes::Bytes::from(endpoint.response.body.clone())))
-                .unwrap_or_else(|_| {
-                    Response::new(Full::new(bytes::Bytes::from("Internal error")))
-                }))
+                .body(Full::new(bytes::Bytes::from(
+                    endpoint.response.body.clone(),
+                )))
+                .unwrap_or_else(|_| Response::new(Full::new(bytes::Bytes::from("Internal error")))))
         }
         None => {
             // No matching endpoint — return 404

@@ -18,8 +18,6 @@ pub enum FocusedPane {
     UrlBar,
     /// Method selector.
     MethodSelector,
-    /// Request body editor.
-    RequestBody,
     /// Response body viewer.
     ResponseBody,
     /// Key-value editor (headers/params).
@@ -56,7 +54,6 @@ pub enum ResponseTab {
     Tests,
 }
 
-
 /// Input mode for key-value editor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KvEditMode {
@@ -88,7 +85,7 @@ impl AuthType {
     }
 
     /// Display name.
-    pub fn label(&self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Self::None => "None",
             Self::Bearer => "Bearer Token",
@@ -278,10 +275,6 @@ pub struct App {
     pub script_editing: bool,
     /// Test run results from collection runner.
     pub test_results: Option<crusty_testing::runner::CollectionRunResult>,
-    /// Whether a test run is in progress.
-    pub test_running: bool,
-    /// Which collection to run tests on (index).
-    pub test_collection_index: usize,
     /// Selected test result entry for scrolling.
     pub test_result_scroll: usize,
     /// Script logs from the last run.
@@ -294,8 +287,7 @@ impl App {
     /// Create a new App with default state.
     pub fn new() -> Self {
         // Try to open store in a standard location
-        let store = dirs_data_path()
-            .and_then(|p| Store::open(&p).ok());
+        let store = dirs_data_path().and_then(|p| Store::open(&p).ok());
 
         Self {
             focus: FocusedPane::UrlBar,
@@ -365,8 +357,6 @@ impl App {
             script_cursor: 0,
             script_editing: false,
             test_results: None,
-            test_running: false,
-            test_collection_index: 0,
             test_result_scroll: 0,
             script_logs: Vec::new(),
             send_requested: false,
@@ -386,10 +376,14 @@ impl App {
     pub fn record_history(&mut self) {
         let Some(ref store) = self.store else { return };
         let status = self.response.as_ref().map(|r| r.status);
-        let duration = self.response.as_ref().map(|r| r.timing.total.as_millis() as u64);
-        let response_data = self.response.as_ref().and_then(|r| {
-            r.body_text().map(|s| s.to_string())
-        });
+        let duration = self
+            .response
+            .as_ref()
+            .map(|r| r.timing.total.as_millis() as u64);
+        let response_data = self
+            .response
+            .as_ref()
+            .and_then(|r| r.body_text().map(|s| s.to_string()));
 
         let entry = crusty_store::HistoryEntry {
             id: uuid::Uuid::new_v4().to_string(),
@@ -401,7 +395,8 @@ impl App {
                 "headers": self.headers,
                 "params": self.params,
                 "body": self.body_input,
-            }).to_string(),
+            })
+            .to_string(),
             response_data,
             timestamp: chrono::Utc::now().to_rfc3339(),
         };
@@ -435,8 +430,7 @@ impl App {
 
     /// Get the active environment, if any.
     pub fn active_environment(&self) -> Option<&Environment> {
-        self.active_env_index
-            .and_then(|i| self.environments.get(i))
+        self.active_env_index.and_then(|i| self.environments.get(i))
     }
 
     /// Build a resolved request from the current app state.
@@ -460,17 +454,10 @@ impl App {
         let _ = auth_config.apply(&mut auth_headers, &mut auth_params);
 
         // Build environment list
-        let envs: Vec<&Environment> = self
-            .active_environment()
-            .into_iter()
-            .collect();
+        let envs: Vec<&Environment> = self.active_environment().into_iter().collect();
 
         // Use the orchestrator
-        let mut resolved = crusty_core::orchestrator::resolve_request(
-            &def,
-            &envs,
-            &auth_headers,
-        )?;
+        let mut resolved = crusty_core::orchestrator::resolve_request(&def, &envs, &auth_headers)?;
 
         // Apply auth query params
         for (key, value) in auth_params {
@@ -552,15 +539,6 @@ impl App {
         }
     }
 
-    /// Save the current environment to the store.
-    pub fn save_current_environment(&self) {
-        if let Some(ref store) = self.store {
-            if let Some(env) = self.active_environment() {
-                let _ = store.save_environment(env);
-            }
-        }
-    }
-
     /// Load collections from the store.
     pub fn load_collections(&mut self) {
         if let Some(ref store) = self.store {
@@ -604,7 +582,10 @@ impl App {
     pub fn sidebar_items(&self) -> Vec<SidebarItem> {
         let mut items = Vec::new();
         for (ci, col) in self.collections.iter().enumerate() {
-            items.push(SidebarItem::Collection { index: ci, name: col.name.clone() });
+            items.push(SidebarItem::Collection {
+                index: ci,
+                name: col.name.clone(),
+            });
             if ci < self.sidebar_expanded.len() && self.sidebar_expanded[ci] {
                 for item in &col.items {
                     if let CollectionItem::Request(req) = item {

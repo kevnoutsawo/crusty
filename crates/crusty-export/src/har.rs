@@ -159,7 +159,10 @@ pub fn export(
                 name: "Crusty".to_string(),
                 version: env!("CARGO_PKG_VERSION").to_string(),
             },
-            entries: entries.iter().map(|(req, resp)| export_entry(req, *resp)).collect(),
+            entries: entries
+                .iter()
+                .map(|(req, resp)| export_entry(req, *resp))
+                .collect(),
         },
     };
     serde_json::to_string_pretty(&har).map_err(|e| ExportError::Serialization(e.to_string()))
@@ -211,7 +214,10 @@ fn export_post_data(body: &RequestBody) -> Option<HarPostData> {
             text: raw.clone(),
             params: Vec::new(),
         }),
-        RequestBody::Raw { content, content_type } => Some(HarPostData {
+        RequestBody::Raw {
+            content,
+            content_type,
+        } => Some(HarPostData {
             mime_type: content_type.clone(),
             text: content.clone(),
             params: Vec::new(),

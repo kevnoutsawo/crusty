@@ -5,7 +5,7 @@
 //! Provides an HTTP proxy server that captures all traffic passing
 //! through it, logging requests and responses for inspection.
 
-mod error;
 pub mod capture;
+mod error;
 
 pub use error::ProxyError;

@@ -5,10 +5,11 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 /// HTTP methods supported by Crusty.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum HttpMethod {
     /// GET method.
+    #[default]
     Get,
     /// POST method.
     Post,
@@ -66,12 +67,6 @@ impl std::fmt::Display for HttpMethod {
     }
 }
 
-impl Default for HttpMethod {
-    fn default() -> Self {
-        Self::Get
-    }
-}
-
 /// A key-value pair that can be enabled or disabled without deletion.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyValue {
@@ -97,8 +92,10 @@ impl KeyValue {
 /// Request body types.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
+#[derive(Default)]
 pub enum RequestBody {
     /// No body.
+    #[default]
     None,
     /// JSON body (raw string, validated as JSON).
     Json(String),
@@ -115,12 +112,6 @@ pub enum RequestBody {
     FormData(Vec<FormDataEntry>),
     /// Binary body (file path).
     Binary(String),
-}
-
-impl Default for RequestBody {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// A single entry in a multipart form data body.

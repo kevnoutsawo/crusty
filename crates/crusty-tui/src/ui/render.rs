@@ -73,7 +73,7 @@ pub fn render(frame: &mut Frame, app: &App) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3), // URL bar
-            Constraint::Min(10),  // Request + Response
+            Constraint::Min(10),   // Request + Response
             Constraint::Length(1), // Status bar
         ])
         .split(main_chunks[1]);
@@ -92,7 +92,11 @@ pub fn render(frame: &mut Frame, app: &App) {
 
 fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     let is_focused = app.focus == FocusedPane::Sidebar;
-    let border_color = if is_focused && app.sidebar_section == 0 { ACCENT_BLUE } else { BORDER };
+    let border_color = if is_focused && app.sidebar_section == 0 {
+        ACCENT_BLUE
+    } else {
+        BORDER
+    };
 
     // Split sidebar: collections top, history bottom
     let chunks = Layout::default()
@@ -126,32 +130,32 @@ fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
                 let is_selected = is_focused && i == app.sidebar_selected;
                 match item {
                     SidebarItem::Collection { index, name } => {
-                        let expanded = *index < app.sidebar_expanded.len()
-                            && app.sidebar_expanded[*index];
+                        let expanded =
+                            *index < app.sidebar_expanded.len() && app.sidebar_expanded[*index];
                         let arrow = if expanded { "▾" } else { "▸" };
                         let style = if is_selected {
-                            Style::default().fg(ACCENT_BLUE).add_modifier(Modifier::BOLD)
+                            Style::default()
+                                .fg(ACCENT_BLUE)
+                                .add_modifier(Modifier::BOLD)
                         } else {
-                            Style::default().fg(TEXT_PRIMARY).add_modifier(Modifier::BOLD)
+                            Style::default()
+                                .fg(TEXT_PRIMARY)
+                                .add_modifier(Modifier::BOLD)
                         };
                         ListItem::new(format!(" {arrow} {name}")).style(style)
                     }
                     SidebarItem::Request { method, name, .. } => {
                         let style = if is_selected {
-                            Style::default().fg(TEXT_PRIMARY).add_modifier(Modifier::REVERSED)
+                            Style::default()
+                                .fg(TEXT_PRIMARY)
+                                .add_modifier(Modifier::REVERSED)
                         } else {
                             Style::default().fg(TEXT_SECONDARY)
                         };
                         ListItem::new(Line::from(vec![
                             Span::styled("   ", Style::default()),
-                            Span::styled(
-                                format!("{:>4} ", method),
-                                method_color_str(method),
-                            ),
-                            Span::styled(
-                                truncate_url(name, 16),
-                                style,
-                            ),
+                            Span::styled(format!("{:>4} ", method), method_color_str(method)),
+                            Span::styled(truncate_url(name, 16), style),
                         ]))
                     }
                 }
@@ -203,17 +207,19 @@ fn render_sidebar(frame: &mut Frame, app: &App, area: Rect) {
                     .map(|s| format!("{s}"))
                     .unwrap_or_else(|| "ERR".to_string());
                 let url_style = if is_selected {
-                    Style::default().fg(TEXT_PRIMARY).add_modifier(Modifier::REVERSED)
+                    Style::default()
+                        .fg(TEXT_PRIMARY)
+                        .add_modifier(Modifier::REVERSED)
                 } else {
                     Style::default().fg(TEXT_PRIMARY)
                 };
                 ListItem::new(Line::from(vec![
                     Span::styled(format!(" {:>4} ", h.method), method_style),
+                    Span::styled(truncate_url(&h.url, 18), url_style),
                     Span::styled(
-                        truncate_url(&h.url, 18),
-                        url_style,
+                        format!(" {status_str}"),
+                        Style::default().fg(TEXT_SECONDARY),
                     ),
-                    Span::styled(format!(" {status_str}"), Style::default().fg(TEXT_SECONDARY)),
                 ]))
             })
             .collect();
@@ -241,14 +247,18 @@ fn render_url_bar(frame: &mut Frame, app: &App, area: Rect) {
     let method_text = format!(" {} ", app.method.as_str());
     let method_block = Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(if app.focus == FocusedPane::MethodSelector {
-            ACCENT_BLUE
-        } else {
-            BORDER
-        }))
+        .border_style(
+            Style::default().fg(if app.focus == FocusedPane::MethodSelector {
+                ACCENT_BLUE
+            } else {
+                BORDER
+            }),
+        )
         .style(Style::default().bg(BG_SURFACE));
     frame.render_widget(
-        Paragraph::new(method_text).style(method_style).block(method_block),
+        Paragraph::new(method_text)
+            .style(method_style)
+            .block(method_block),
         chunks[0],
     );
 
@@ -335,13 +345,19 @@ fn render_url_bar(frame: &mut Frame, app: &App, area: Rect) {
         Style::default().fg(BG_PRIMARY).bg(ACCENT_BLUE).bold()
     };
     let send_text = if app.loading { " Sending " } else { "  Send  " };
-    let send_border = if send_focused { STATUS_SUCCESS } else { ACCENT_BLUE };
+    let send_border = if send_focused {
+        STATUS_SUCCESS
+    } else {
+        ACCENT_BLUE
+    };
     let send_block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(send_border))
         .style(Style::default().bg(BG_SURFACE));
     frame.render_widget(
-        Paragraph::new(send_text).style(send_style).block(send_block),
+        Paragraph::new(send_text)
+            .style(send_style)
+            .block(send_block),
         chunks[3],
     );
 }
@@ -350,20 +366,30 @@ fn render_request_pane(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .title(" Request ")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(
-            if matches!(app.focus, FocusedPane::KeyValueEditor) {
+        .border_style(
+            Style::default().fg(if matches!(app.focus, FocusedPane::KeyValueEditor) {
                 ACCENT_BLUE
             } else {
                 BORDER
-            },
-        ))
+            }),
+        )
         .style(Style::default().bg(BG_SURFACE));
 
-    let tabs = Tabs::new(vec!["1:Params", "2:Headers", "3:Body", "4:Auth", "5:Script"])
-        .select(app.request_tab as usize)
-        .style(Style::default().fg(TEXT_SECONDARY))
-        .highlight_style(Style::default().fg(ACCENT_BLUE).add_modifier(Modifier::BOLD))
-        .divider("│");
+    let tabs = Tabs::new(vec![
+        "1:Params",
+        "2:Headers",
+        "3:Body",
+        "4:Auth",
+        "5:Script",
+    ])
+    .select(app.request_tab as usize)
+    .style(Style::default().fg(TEXT_SECONDARY))
+    .highlight_style(
+        Style::default()
+            .fg(ACCENT_BLUE)
+            .add_modifier(Modifier::BOLD),
+    )
+    .divider("│");
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -426,21 +452,12 @@ fn render_kv_editor(
             // If editing this row, show the edit buffer
             if is_selected && app.kv_mode != KvEditMode::Navigate {
                 let (key_str, val_str) = match app.kv_mode {
-                    KvEditMode::EditKey => (
-                        format!("▸{}◂", app.kv_edit_buf),
-                        kv.value.clone(),
-                    ),
-                    KvEditMode::EditValue => (
-                        kv.key.clone(),
-                        format!("▸{}◂", app.kv_edit_buf),
-                    ),
+                    KvEditMode::EditKey => (format!("▸{}◂", app.kv_edit_buf), kv.value.clone()),
+                    KvEditMode::EditValue => (kv.key.clone(), format!("▸{}◂", app.kv_edit_buf)),
                     _ => (kv.key.clone(), kv.value.clone()),
                 };
                 return ListItem::new(Line::from(vec![
-                    Span::styled(
-                        format!(" {prefix} "),
-                        Style::default().fg(ACCENT_BLUE),
-                    ),
+                    Span::styled(format!(" {prefix} "), Style::default().fg(ACCENT_BLUE)),
                     Span::styled(key_str, Style::default().fg(ACCENT_BLUE)),
                     Span::styled(" = ", Style::default().fg(TEXT_SECONDARY)),
                     Span::styled(val_str, Style::default().fg(ACCENT_BLUE)),
@@ -448,7 +465,9 @@ fn render_kv_editor(
             }
 
             let base_style = if is_selected {
-                Style::default().fg(TEXT_PRIMARY).add_modifier(Modifier::REVERSED)
+                Style::default()
+                    .fg(TEXT_PRIMARY)
+                    .add_modifier(Modifier::REVERSED)
             } else if kv.enabled {
                 Style::default().fg(TEXT_PRIMARY)
             } else {
@@ -484,7 +503,11 @@ fn render_body_editor(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    let border_color = if app.body_editing { ACCENT_BLUE } else { BORDER };
+    let border_color = if app.body_editing {
+        ACCENT_BLUE
+    } else {
+        BORDER
+    };
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(border_color))
@@ -559,14 +582,26 @@ fn render_auth_form(frame: &mut Frame, app: &App, area: Rect) {
         AuthType::Basic => {
             let editing_user = app.auth_editing && app.auth_field_index == 0;
             let editing_pass = app.auth_editing && app.auth_field_index == 1;
-            lines.push(auth_field_line("Username", &app.auth_basic_user, editing_user));
-            lines.push(auth_field_line("Password", &app.auth_basic_pass, editing_pass));
+            lines.push(auth_field_line(
+                "Username",
+                &app.auth_basic_user,
+                editing_user,
+            ));
+            lines.push(auth_field_line(
+                "Password",
+                &app.auth_basic_pass,
+                editing_pass,
+            ));
         }
         AuthType::ApiKey => {
             let editing_key = app.auth_editing && app.auth_field_index == 0;
             let editing_val = app.auth_editing && app.auth_field_index == 1;
             lines.push(auth_field_line("Key", &app.auth_apikey_key, editing_key));
-            lines.push(auth_field_line("Value", &app.auth_apikey_value, editing_val));
+            lines.push(auth_field_line(
+                "Value",
+                &app.auth_apikey_value,
+                editing_val,
+            ));
             let location = if app.auth_apikey_in_header {
                 "Header"
             } else {
@@ -589,7 +624,9 @@ fn auth_field_line<'a>(label: &'a str, value: &'a str, editing: bool) -> Line<'a
         value
     };
     let val_style = if editing {
-        Style::default().fg(ACCENT_BLUE).add_modifier(Modifier::UNDERLINED)
+        Style::default()
+            .fg(ACCENT_BLUE)
+            .add_modifier(Modifier::UNDERLINED)
     } else if value.is_empty() {
         Style::default().fg(TEXT_SECONDARY)
     } else {
@@ -611,13 +648,13 @@ fn render_response_pane(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .title(response_title(app))
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(
-            if app.focus == FocusedPane::ResponseBody {
+        .border_style(
+            Style::default().fg(if app.focus == FocusedPane::ResponseBody {
                 ACCENT_BLUE
             } else {
                 BORDER
-            },
-        ))
+            }),
+        )
         .style(Style::default().bg(BG_SURFACE));
 
     let inner = block.inner(area);
@@ -653,7 +690,11 @@ fn render_response_pane(frame: &mut Frame, app: &App, area: Rect) {
     let tabs = Tabs::new(vec!["F1:Body", "F2:Headers", "F3:Timing", "F4:Tests"])
         .select(app.response_tab as usize)
         .style(Style::default().fg(TEXT_SECONDARY))
-        .highlight_style(Style::default().fg(ACCENT_BLUE).add_modifier(Modifier::BOLD))
+        .highlight_style(
+            Style::default()
+                .fg(ACCENT_BLUE)
+                .add_modifier(Modifier::BOLD),
+        )
         .divider("│");
 
     let tab_chunks = Layout::default()
@@ -664,7 +705,9 @@ fn render_response_pane(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(tabs, tab_chunks[0]);
 
     match app.response_tab {
-        ResponseTab::Body => render_response_body(frame, response, app.response_scroll, tab_chunks[1]),
+        ResponseTab::Body => {
+            render_response_body(frame, response, app.response_scroll, tab_chunks[1]);
+        }
         ResponseTab::Headers => render_response_headers(frame, response, tab_chunks[1]),
         ResponseTab::Timing => render_response_timing(frame, response, tab_chunks[1]),
         ResponseTab::Tests => render_test_results(frame, app, tab_chunks[1]),
@@ -736,7 +779,10 @@ fn render_response_timing(frame: &mut Frame, response: &HttpResponse, area: Rect
     let total_ms = timing.total.as_millis();
     let mut lines: Vec<Line<'_>> = vec![Line::from(vec![
         Span::styled("Total:             ", Style::default().fg(TEXT_SECONDARY)),
-        Span::styled(format!("{total_ms}ms"), Style::default().fg(TEXT_PRIMARY).bold()),
+        Span::styled(
+            format!("{total_ms}ms"),
+            Style::default().fg(TEXT_PRIMARY).bold(),
+        ),
     ])];
 
     if let Some(ttfb) = timing.ttfb {
@@ -790,16 +836,19 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     } else if app.focus == FocusedPane::SendButton {
         "Enter/Space: Send request │ Tab: Next pane │ Esc: Response".to_string()
     } else if app.focus == FocusedPane::UrlBar {
-        "Enter: Send │ Tab: Edit request │ m: Method │ Esc: Response │ Ctrl+R: Send │ ?: Help".to_string()
+        "Enter: Send │ Tab: Edit request │ m: Method │ Esc: Response │ Ctrl+R: Send │ ?: Help"
+            .to_string()
     } else if app.focus == FocusedPane::ResponseBody {
         "j/k: Scroll │ 1-5: Request tabs │ F1-F4: Response tabs │ i/Enter: URL bar │ Shift+Tab: Send btn │ ?: Help".to_string()
     } else if app.focus == FocusedPane::Sidebar && app.sidebar_section == 0 {
-        "j/k: Navigate │ Enter/l: Expand/Load │ h: Collapse │ 2: History │ /: Search │ Tab: URL bar".to_string()
+        "j/k: Navigate │ Enter/l: Expand/Load │ h: Collapse │ 2: History │ /: Search │ Tab: History"
+            .to_string()
     } else if app.focus == FocusedPane::Sidebar && app.sidebar_section == 1 {
         if app.history_search_active {
             "Type to filter │ Enter: Apply │ Esc: Cancel search".to_string()
         } else {
-            "j/k: Navigate │ Enter: Load request │ /: Search │ 1: Collections │ Tab: URL bar".to_string()
+            "j/k: Navigate │ Enter: Load request │ /: Search │ 1: Collections │ Tab: URL bar"
+                .to_string()
         }
     } else {
         let env_hint = if !app.environments.is_empty() {
@@ -854,7 +903,10 @@ fn render_help_overlay(frame: &mut Frame, area: Rect) {
         .iter()
         .map(|(key, desc)| {
             Line::from(vec![
-                Span::styled(format!("  {key:<24}"), Style::default().fg(ACCENT_BLUE).bold()),
+                Span::styled(
+                    format!("  {key:<24}"),
+                    Style::default().fg(ACCENT_BLUE).bold(),
+                ),
                 Span::styled(*desc, Style::default().fg(TEXT_PRIMARY)),
             ])
         })
@@ -885,7 +937,7 @@ fn render_curl_import_overlay(frame: &mut Frame, app: &App, area: Rect) {
         .constraints([
             Constraint::Length(2), // Instruction
             Constraint::Length(3), // Input
-            Constraint::Min(1),   // Error / status
+            Constraint::Min(1),    // Error / status
         ])
         .split(inner);
 
@@ -919,8 +971,7 @@ fn render_curl_import_overlay(frame: &mut Frame, app: &App, area: Rect) {
     // Error message
     if let Some(ref err) = app.curl_import_error {
         frame.render_widget(
-            Paragraph::new(format!("  Error: {err}"))
-                .style(Style::default().fg(STATUS_ERROR)),
+            Paragraph::new(format!("  Error: {err}")).style(Style::default().fg(STATUS_ERROR)),
             chunks[2],
         );
     } else {
@@ -969,7 +1020,7 @@ fn render_env_dialog(frame: &mut Frame, app: &App, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(3),   // Variables
+            Constraint::Min(3),    // Variables
             Constraint::Length(1), // Hints
         ])
         .split(inner);
@@ -998,10 +1049,7 @@ fn render_env_dialog(frame: &mut Frame, app: &App, area: Rect) {
                                 format!("▸{}◂", app.env_var_edit_buf),
                                 var.value.reveal().to_string(),
                             ),
-                            2 => (
-                                var.key.clone(),
-                                format!("▸{}◂", app.env_var_edit_buf),
-                            ),
+                            2 => (var.key.clone(), format!("▸{}◂", app.env_var_edit_buf)),
                             _ => (var.key.clone(), var.value.reveal().to_string()),
                         };
                         return ListItem::new(Line::from(vec![
@@ -1085,20 +1133,23 @@ fn render_save_dialog(frame: &mut Frame, app: &App, area: Rect) {
             Constraint::Length(1), // Label
             Constraint::Length(3), // Name input
             Constraint::Length(1), // Label
-            Constraint::Min(3),   // Collection list
+            Constraint::Min(3),    // Collection list
             Constraint::Length(1), // Hints
         ])
         .split(inner);
 
     // Name label
     frame.render_widget(
-        Paragraph::new("  Request name:")
-            .style(Style::default().fg(TEXT_SECONDARY)),
+        Paragraph::new("  Request name:").style(Style::default().fg(TEXT_SECONDARY)),
         chunks[0],
     );
 
     // Name input
-    let name_border = if app.save_editing_name { ACCENT_BLUE } else { BORDER };
+    let name_border = if app.save_editing_name {
+        ACCENT_BLUE
+    } else {
+        BORDER
+    };
     let name_block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(name_border))
@@ -1137,7 +1188,9 @@ fn render_save_dialog(frame: &mut Frame, app: &App, area: Rect) {
             .map(|(i, col)| {
                 let is_selected = !app.save_editing_name && i == app.save_collection_index;
                 let style = if is_selected {
-                    Style::default().fg(ACCENT_BLUE).add_modifier(Modifier::REVERSED)
+                    Style::default()
+                        .fg(ACCENT_BLUE)
+                        .add_modifier(Modifier::REVERSED)
                 } else {
                     Style::default().fg(TEXT_PRIMARY)
                 };
@@ -1147,7 +1200,11 @@ fn render_save_dialog(frame: &mut Frame, app: &App, area: Rect) {
 
         let list_block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(if app.save_editing_name { BORDER } else { ACCENT_BLUE }))
+            .border_style(Style::default().fg(if app.save_editing_name {
+                BORDER
+            } else {
+                ACCENT_BLUE
+            }))
             .style(Style::default().bg(BG_SURFACE));
 
         frame.render_widget(List::new(items).block(list_block), chunks[3]);
@@ -1273,7 +1330,11 @@ fn render_script_editor(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    let border_color = if app.script_editing { ACCENT_BLUE } else { BORDER };
+    let border_color = if app.script_editing {
+        ACCENT_BLUE
+    } else {
+        BORDER
+    };
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(border_color))
@@ -1348,7 +1409,10 @@ fn render_test_results(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled(
                 format!(
                     "[{}] {}ms",
-                    req_result.status.map(|s| s.to_string()).unwrap_or_else(|| "ERR".to_string()),
+                    req_result
+                        .status
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "ERR".to_string()),
                     req_result.duration_ms
                 ),
                 Style::default().fg(TEXT_SECONDARY),
@@ -1386,7 +1450,9 @@ fn render_test_results(frame: &mut Frame, app: &App, area: Rect) {
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "  Logs:",
-                Style::default().fg(TEXT_SECONDARY).add_modifier(Modifier::ITALIC),
+                Style::default()
+                    .fg(TEXT_SECONDARY)
+                    .add_modifier(Modifier::ITALIC),
             )));
             for log in &req_result.logs {
                 lines.push(Line::from(Span::styled(

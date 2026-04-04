@@ -61,7 +61,9 @@ impl Store {
 
     /// List all collections (id and name only for sidebar).
     pub fn list_collections(&self) -> Result<Vec<(Uuid, String)>> {
-        let mut stmt = self.conn.prepare("SELECT id, name FROM collections ORDER BY name")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name FROM collections ORDER BY name")?;
         let rows = stmt.query_map([], |row| {
             let id_str: String = row.get(0)?;
             let name: String = row.get(1)?;
@@ -80,10 +82,8 @@ impl Store {
 
     /// Delete a collection by ID.
     pub fn delete_collection(&self, id: &Uuid) -> Result<()> {
-        self.conn.execute(
-            "DELETE FROM collections WHERE id = ?1",
-            [id.to_string()],
-        )?;
+        self.conn
+            .execute("DELETE FROM collections WHERE id = ?1", [id.to_string()])?;
         Ok(())
     }
 
@@ -119,7 +119,9 @@ impl Store {
 
     /// List all environments.
     pub fn list_environments(&self) -> Result<Vec<(Uuid, String)>> {
-        let mut stmt = self.conn.prepare("SELECT id, name FROM environments ORDER BY name")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name FROM environments ORDER BY name")?;
         let rows = stmt.query_map([], |row| {
             let id_str: String = row.get(0)?;
             let name: String = row.get(1)?;
@@ -138,10 +140,8 @@ impl Store {
 
     /// Delete an environment by ID.
     pub fn delete_environment(&self, id: &Uuid) -> Result<()> {
-        self.conn.execute(
-            "DELETE FROM environments WHERE id = ?1",
-            [id.to_string()],
-        )?;
+        self.conn
+            .execute("DELETE FROM environments WHERE id = ?1", [id.to_string()])?;
         Ok(())
     }
 
@@ -212,7 +212,10 @@ mod tests {
         let store = Store::open_in_memory().unwrap();
 
         let mut col = Collection::new("Test API");
-        col.add_request(RequestDefinition::new("Get Users", "https://api.example.com/users"));
+        col.add_request(RequestDefinition::new(
+            "Get Users",
+            "https://api.example.com/users",
+        ));
 
         // Save
         store.save_collection(&col).unwrap();
