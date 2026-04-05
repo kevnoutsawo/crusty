@@ -1,5 +1,9 @@
 [advisories]
 version = 2
+ignore = [
+    # paste is unmaintained but is a transitive dep (via rhai) with no alternative yet
+    "RUSTSEC-2024-0436",
+]
 
 [licenses]
 version = 2
@@ -16,6 +20,7 @@ allow = [
     "CC0-1.0",
     "MPL-2.0",
     "BSL-1.0",
+    "CDLA-Permissive-2.0",
 ]
 
 [bans]
