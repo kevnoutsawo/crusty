@@ -14,7 +14,7 @@ pub struct HistoryEntry {
     /// Response status code (None if the request failed).
     pub status: Option<u16>,
     /// Total duration in milliseconds.
-    pub duration_ms: Option<u64>,
+    pub duration_ms: Option<i64>,
     /// Serialized request definition.
     pub request_data: String,
     /// Serialized response (None if the request failed).
