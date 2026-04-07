@@ -71,7 +71,19 @@ Crusty runs entirely on your machine. No accounts, no cloud sync, no telemetry. 
 
 ## Install
 
-### Download a binary
+### Linux / macOS
+
+```bash
+curl -sSf https://raw.githubusercontent.com/kevnoutsawo/crusty/main/install.sh | sh
+```
+
+### Windows
+
+```powershell
+irm https://raw.githubusercontent.com/kevnoutsawo/crusty/main/install.ps1 | iex
+```
+
+### Download a binary manually
 
 Grab the latest release for your platform from [Releases](https://github.com/kevnoutsawo/crusty/releases):
 
@@ -82,18 +94,6 @@ Grab the latest release for your platform from [Releases](https://github.com/kev
 | macOS (Intel) | `crusty-x86_64-apple-darwin.tar.gz` |
 | macOS (Apple Silicon) | `crusty-aarch64-apple-darwin.tar.gz` |
 | Windows (x86_64) | `crusty-x86_64-pc-windows-msvc.zip` |
-
-**Linux / macOS:**
-
-```bash
-tar xzf crusty-*.tar.gz
-chmod +x crusty-tui
-sudo mv crusty-tui /usr/local/bin/
-```
-
-**Windows:**
-
-Extract the zip and add `crusty-tui.exe` to your PATH.
 
 ### Build from source
 
