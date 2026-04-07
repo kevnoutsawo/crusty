@@ -379,7 +379,7 @@ impl App {
         let duration = self
             .response
             .as_ref()
-            .map(|r| r.timing.total.as_millis() as u64);
+            .map(|r| r.timing.total.as_millis() as i64);
         let response_data = self
             .response
             .as_ref()
