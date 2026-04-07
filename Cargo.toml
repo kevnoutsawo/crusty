@@ -35,7 +35,7 @@ thiserror = "2"
 miette = { version = "7", features = ["fancy"] }
 
 # HTTP
-reqwest = { version = "0.12", features = ["json", "cookies", "rustls-tls", "multipart", "gzip", "brotli", "deflate"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "cookies", "rustls-tls", "multipart", "gzip", "brotli", "deflate"] }
 http = "1"
 
 # Storage
