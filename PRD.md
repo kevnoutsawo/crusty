@@ -1,6 +1,6 @@
-# Agent Prompt: Build "Reqcraft" — A Rust HTTP Client for Developers
+# Agent Prompt: Build "Crusty" — A Rust HTTP Client for Developers
 
-You are building **Reqcraft**, an open-source, developer-grade HTTP client written in Rust. It is a full-featured alternative to Postman, Insomnia, and httpie — architected for precision, speed, and accuracy. It ships as three frontends on a single shared core: a **Tauri desktop app**, a **browser-deployed WASM app**, and a **TUI** (terminal UI).
+You are building **Crusty**, an open-source, developer-grade HTTP client written in Rust. It is a full-featured alternative to Postman, Insomnia, and httpie — architected for precision, speed, and accuracy. It ships as three frontends on a single shared core: a **Tauri desktop app**, a **browser-deployed WASM app**, and a **TUI** (terminal UI).
 
 Every design decision must serve developers and software engineers. The UX must feel like it was built by someone who debugs APIs for a living.
 
@@ -11,22 +11,22 @@ Every design decision must serve developers and software engineers. The UX must 
 ### 1.1 Crate Topology (Cargo Workspace)
 
 ```
-reqcraft/
+crusty/
 ├── Cargo.toml                  # workspace root
 ├── crates/
-│   ├── reqcraft-core/          # Pure Rust. Zero UI. All business logic.
-│   ├── reqcraft-http/          # HTTP engine (reqwest + hyper abstraction)
-│   ├── reqcraft-proto/         # Protocol adapters: REST, GraphQL, gRPC, WebSocket, SSE, MQTT, Socket.IO
-│   ├── reqcraft-scripting/     # Pre/post-request scripting engine (Rhai or mlua)
-│   ├── reqcraft-store/         # Persistence: collections, environments, history (SQLite via rusqlite)
-│   ├── reqcraft-auth/          # Auth flows: OAuth2, JWT, API Key, Basic, Bearer, Digest, AWS Sig v4, mTLS
-│   ├── reqcraft-export/        # Import/export: Postman, Insomnia, OpenAPI, cURL, HAR
-│   ├── reqcraft-testing/       # Test runner, assertions, CI mode, collection runner
-│   ├── reqcraft-proxy/         # Proxy interception, MITM-style request capture
-│   ├── reqcraft-mock/          # Mock server engine
-│   ├── reqcraft-tauri/         # Tauri v2 desktop frontend
-│   ├── reqcraft-web/           # WASM frontend (Leptos or Dioxus + wasm-bindgen)
-│   └── reqcraft-tui/           # Terminal UI (ratatui)
+│   ├── crusty-core/          # Pure Rust. Zero UI. All business logic.
+│   ├── crusty-http/          # HTTP engine (reqwest + hyper abstraction)
+│   ├── crusty-proto/         # Protocol adapters: REST, GraphQL, gRPC, WebSocket, SSE, MQTT, Socket.IO
+│   ├── crusty-scripting/     # Pre/post-request scripting engine (Rhai or mlua)
+│   ├── crusty-store/         # Persistence: collections, environments, history (SQLite via rusqlite)
+│   ├── crusty-auth/          # Auth flows: OAuth2, JWT, API Key, Basic, Bearer, Digest, AWS Sig v4, mTLS
+│   ├── crusty-export/        # Import/export: Postman, Insomnia, OpenAPI, cURL, HAR
+│   ├── crusty-testing/       # Test runner, assertions, CI mode, collection runner
+│   ├── crusty-proxy/         # Proxy interception, MITM-style request capture
+│   ├── crusty-mock/          # Mock server engine
+│   ├── crusty-tauri/         # Tauri v2 desktop frontend
+│   ├── crusty-web/           # WASM frontend (Leptos or Dioxus + wasm-bindgen)
+│   └── crusty-tui/           # Terminal UI (ratatui)
 ├── proto/                      # .proto files for gRPC support
 ├── assets/                     # Icons, fonts, themes
 ├── tests/                      # Integration tests
@@ -35,8 +35,8 @@ reqcraft/
 
 ### 1.2 Core Principles
 
-- **`reqcraft-core` is the gravity center.** It owns request construction, response parsing, variable interpolation, environment resolution, collection tree operations, and orchestration. It is frontend-agnostic, `#![no_std]`-compatible where feasible, and fully unit-tested.
-- **`reqcraft-http` wraps `reqwest` (native) and `gloo-net`/`web-sys` (WASM).** Use conditional compilation (`#[cfg(target_arch = "wasm32")]`) to switch transports. Never leak transport details into core.
+- **`crusty-core` is the gravity center.** It owns request construction, response parsing, variable interpolation, environment resolution, collection tree operations, and orchestration. It is frontend-agnostic, `#![no_std]`-compatible where feasible, and fully unit-tested.
+- **`crusty-http` wraps `reqwest` (native) and `gloo-net`/`web-sys` (WASM).** Use conditional compilation (`#[cfg(target_arch = "wasm32")]`) to switch transports. Never leak transport details into core.
 - **Every crate exposes a clean trait boundary.** Frontends consume traits, never concrete types. This enforces the contract: if it compiles for Tauri, it compiles for WASM and TUI.
 - **Async-first via `tokio` (native) and `wasm-bindgen-futures` (WASM).** Use `async-trait` or associated futures at crate boundaries.
 - **Error handling:** Use `thiserror` for library crates, `miette` or `color-eyre` for user-facing error display. Every error must be actionable — include what went wrong, why, and what the user can do.
@@ -46,11 +46,11 @@ reqcraft/
 ```
 User action (UI event)
   → Frontend adapter (Tauri command / WASM binding / TUI event)
-    → reqcraft-core (orchestration: interpolate vars, resolve env, run pre-scripts)
-      → reqcraft-http (execute request)
-      → reqcraft-proto (protocol-specific encoding/decoding)
+    → crusty-core (orchestration: interpolate vars, resolve env, run pre-scripts)
+      → crusty-http (execute request)
+      → crusty-proto (protocol-specific encoding/decoding)
     ← Response + metadata (timing, TLS info, redirect chain, size)
-  ← reqcraft-core (run post-scripts, assertions, store history)
+  ← crusty-core (run post-scripts, assertions, store history)
 ← Frontend renders response
 ```
 
@@ -167,7 +167,7 @@ User action (UI event)
   - Assert schema (JSON Schema validation).
   - Chain requests: extract values from responses into variables for subsequent requests.
 - **Test runner UI:** Run results with pass/fail/skip counts, duration, expandable details per assertion.
-- **CI/CLI mode:** `reqcraft run <collection> --environment <env> --reporters cli,junit,json` — outputs JUnit XML, JSON report, or custom format. Exit code reflects pass/fail. This is the `reqcraft-testing` crate invoked directly from the TUI or a headless CLI binary.
+- **CI/CLI mode:** `crusty run <collection> --environment <env> --reporters cli,junit,json` — outputs JUnit XML, JSON report, or custom format. Exit code reflects pass/fail. This is the `crusty-testing` crate invoked directly from the TUI or a headless CLI binary.
 - **Load testing (lightweight):** Configurable concurrent requests, iterations, ramp-up. Display RPS, latency percentiles (p50, p95, p99), error rate. Not a full load tester — positioned as quick sanity checks.
 
 ### 2.7 Mock Server
@@ -263,7 +263,7 @@ User action (UI event)
 - No animation on initial page load (content appears instantly; only subsequent state changes animate).
 - Respect `prefers-reduced-motion`: disable all animations if set.
 
-### 3.3 Tauri Desktop Frontend (`reqcraft-tauri`)
+### 3.3 Tauri Desktop Frontend (`crusty-tauri`)
 
 - **Framework:** Tauri v2 with a Rust backend. Frontend in TypeScript with **SolidJS** (not React — smaller bundle, true reactivity, no virtual DOM overhead — this is a performance tool).
 - **Styling:** Tailwind CSS v4 + CSS custom properties for theming. No CSS-in-JS.
@@ -273,18 +273,18 @@ User action (UI event)
 - **System integration:** Native menus, native file dialogs, system tray with quick-launch, global shortcut for quick request (think Spotlight/Alfred), auto-update via Tauri updater.
 - **Window management:** Multi-window support (open requests in new windows). Remember window position and size.
 
-### 3.4 Browser WASM Frontend (`reqcraft-web`)
+### 3.4 Browser WASM Frontend (`crusty-web`)
 
-- **Framework:** Same SolidJS component library as Tauri, shared via a `reqcraft-ui` package. WASM core compiled with `wasm-pack`.
+- **Framework:** Same SolidJS component library as Tauri, shared via a `crusty-ui` package. WASM core compiled with `wasm-pack`.
 - **Limitations to handle gracefully:**
   - No filesystem access → Use IndexedDB (via `idb` crate or JS interop) for persistence. File import/export via browser APIs.
   - No raw TCP/TLS → gRPC and MQTT via browser-compatible transports only (gRPC-web, MQTT over WebSocket). Show clear messaging when a feature requires native transport: "This protocol requires the desktop app."
-  - CORS restrictions → Document clearly. Provide a companion `reqcraft-cors-proxy` (tiny Rust binary) users can run locally. Show a help banner when CORS errors are detected.
+  - CORS restrictions → Document clearly. Provide a companion `crusty-cors-proxy` (tiny Rust binary) users can run locally. Show a help banner when CORS errors are detected.
   - No proxy/MITM features → Disable gracefully with "Desktop only" badges.
 - **PWA:** Full PWA support (Service Worker, manifest, offline capable for cached collections).
 - **Deployment:** Static site. Deploy to Vercel/Netlify/Cloudflare Pages. Single `index.html` + WASM bundle + JS glue.
 
-### 3.5 TUI Frontend (`reqcraft-tui`)
+### 3.5 TUI Frontend (`crusty-tui`)
 
 - **Framework:** `ratatui` with `crossterm` backend.
 - **Layout:**
@@ -319,9 +319,9 @@ User action (UI event)
 
 ### 4.2 Configuration
 
-- **Config file:** `~/.config/reqcraft/config.toml` (native) or IndexedDB (WASM).
+- **Config file:** `~/.config/crusty/config.toml` (native) or IndexedDB (WASM).
 - **Configurable:** Theme, font size, density, keybindings, default headers, proxy settings, TLS settings, editor preferences (word wrap, minimap, ligatures), auto-save interval, history retention, telemetry opt-in/out.
-- **CLI flags override config file.** Environment variables override both (`REQCRAFT_THEME=dark`).
+- **CLI flags override config file.** Environment variables override both (`CRUSTY_THEME=dark`).
 
 ---
 
@@ -335,14 +335,14 @@ cargo tauri build                    # Release build for current OS
 cargo tauri dev                      # Dev mode with hot-reload
 
 # WASM
-wasm-pack build crates/reqcraft-web --target web
+wasm-pack build crates/crusty-web --target web
 # Serve with any static server
 
 # TUI
-cargo build --bin reqcraft-tui --release
+cargo build --bin crusty-tui --release
 
 # CLI (headless test runner)
-cargo build --bin reqcraft-cli --release
+cargo build --bin crusty-cli --release
 ```
 
 ### 5.2 Testing Strategy
@@ -362,10 +362,10 @@ cargo build --bin reqcraft-cli --release
 ### Phase 1: Foundation (Core + TUI MVP)
 
 1. Set up Cargo workspace with all crate skeletons.
-2. `reqcraft-core`: Request/response models, environment variable interpolation, collection tree data structures.
-3. `reqcraft-http`: Basic HTTP client (GET, POST, PUT, DELETE) with `reqwest`. Timing instrumentation.
-4. `reqcraft-store`: SQLite schema, CRUD for collections, requests, environments, history.
-5. `reqcraft-tui`: Basic layout — URL input, method selector, response viewer (body + headers + status).
+2. `crusty-core`: Request/response models, environment variable interpolation, collection tree data structures.
+3. `crusty-http`: Basic HTTP client (GET, POST, PUT, DELETE) with `reqwest`. Timing instrumentation.
+4. `crusty-store`: SQLite schema, CRUD for collections, requests, environments, history.
+5. `crusty-tui`: Basic layout — URL input, method selector, response viewer (body + headers + status).
 6. End-to-end: Type a URL in TUI → send request → see response.
 
 ### Phase 2: Request Builder Completeness
@@ -393,8 +393,8 @@ cargo build --bin reqcraft-cli --release
 
 ### Phase 5: Testing & Scripting
 
-21. `reqcraft-scripting`: Rhai integration. Pre/post-request script API (set variables, assert, log).
-22. `reqcraft-testing`: Assertion engine, collection runner, CI reporter (JUnit, JSON).
+21. `crusty-scripting`: Rhai integration. Pre/post-request script API (set variables, assert, log).
+22. `crusty-testing`: Assertion engine, collection runner, CI reporter (JUnit, JSON).
 23. Test runner UI in Tauri and TUI.
 
 ### Phase 6: Browser WASM
@@ -433,7 +433,7 @@ cargo build --bin reqcraft-cli --release
 
 ## 8. File & Naming Conventions
 
-- Crate names: `reqcraft-*` (kebab-case).
+- Crate names: `crusty-*` (kebab-case).
 - Rust modules: `snake_case`.
 - TypeScript/SolidJS: PascalCase components, camelCase functions, kebab-case files.
 - CSS: Tailwind utilities. Custom CSS in `*.module.css` only when Tailwind insufficient.
@@ -456,7 +456,7 @@ cargo build --bin reqcraft-cli --release
 
 When complete, a developer should be able to:
 
-1. Open Reqcraft and immediately send a GET request in under 3 seconds.
+1. Open Crusty and immediately send a GET request in under 3 seconds.
 2. Build a complex OAuth2-authenticated, multi-step API workflow with variable chaining across requests.
 3. Debug a WebSocket connection with message filtering and auto-reconnect.
 4. Run a full collection of 200 requests with parameterized data from a CSV and get a JUnit report for CI.
