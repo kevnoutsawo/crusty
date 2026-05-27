@@ -665,12 +665,18 @@ fn render_response_pane(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(block, area);
 
     if let Some(ref error) = app.error {
-        frame.render_widget(
-            Paragraph::new(format!("Error: {error}"))
-                .style(Style::default().fg(STATUS_ERROR))
-                .wrap(Wrap { trim: false }),
-            inner,
-        );
+        let lines = vec![
+            Line::from(Span::styled(
+                format!("Error: {error}"),
+                Style::default().fg(STATUS_ERROR),
+            )),
+            Line::default(),
+            Line::from(Span::styled(
+                "Press Esc to dismiss, or Ctrl+R to retry.",
+                Style::default().fg(TEXT_SECONDARY),
+            )),
+        ];
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
         return;
     }
 
