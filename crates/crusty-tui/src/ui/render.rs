@@ -1,11 +1,15 @@
 //! Main render function for the TUI layout.
 
 use crate::app::{App, AuthType, FocusedPane, KvEditMode, RequestTab, ResponseTab, SidebarItem};
+use crate::response_scroll;
 use crusty_core::response::{HttpResponse, StatusCategory};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Wrap};
+use ratatui::widgets::{
+    Block, Borders, List, ListItem, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
+    Tabs, Wrap,
+};
 use ratatui::Frame;
 
 // Design system colors from PRD
@@ -706,7 +710,7 @@ fn render_response_pane(frame: &mut Frame, app: &App, area: Rect) {
 
     match app.response_tab {
         ResponseTab::Body => {
-            render_response_body(frame, response, app.response_scroll, tab_chunks[1]);
+            render_response_body(frame, app, response, tab_chunks[1]);
         }
         ResponseTab::Headers => render_response_headers(frame, response, tab_chunks[1]),
         ResponseTab::Timing => render_response_timing(frame, response, tab_chunks[1]),
@@ -742,19 +746,53 @@ fn response_title(app: &App) -> Line<'static> {
     ])
 }
 
-fn render_response_body(frame: &mut Frame, response: &HttpResponse, scroll: u16, area: Rect) {
+fn render_response_body(frame: &mut Frame, app: &App, response: &HttpResponse, area: Rect) {
     let body_text = response
         .body_json_pretty()
         .or_else(|| response.body_text().map(String::from))
         .unwrap_or_else(|| format!("<binary data, {} bytes>", response.body.len()));
+
+    // Compute layout: leave one column on the right for a scrollbar when needed.
+    let content_width = area.width.saturating_sub(1).max(1);
+    let content_height = response_scroll::wrapped_row_count(&body_text, content_width);
+    let viewport_height = area.height;
+
+    app.body_content_height.set(content_height);
+    app.body_viewport_height.set(viewport_height);
+
+    let scroll = response_scroll::clamp(app.response_scroll, content_height, viewport_height);
+    let needs_scrollbar = content_height > viewport_height && area.width >= 2;
+
+    let body_area = if needs_scrollbar {
+        Rect {
+            width: area.width.saturating_sub(1),
+            ..area
+        }
+    } else {
+        area
+    };
 
     frame.render_widget(
         Paragraph::new(body_text)
             .style(Style::default().fg(TEXT_PRIMARY))
             .wrap(Wrap { trim: false })
             .scroll((scroll, 0)),
-        area,
+        body_area,
     );
+
+    if needs_scrollbar {
+        let mut state = ScrollbarState::new(content_height as usize)
+            .position(scroll as usize)
+            .viewport_content_length(viewport_height as usize);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+            .begin_symbol(None)
+            .end_symbol(None)
+            .track_symbol(Some("│"))
+            .thumb_symbol("█")
+            .thumb_style(Style::default().fg(ACCENT_BLUE))
+            .track_style(Style::default().fg(BORDER));
+        frame.render_stateful_widget(scrollbar, area, &mut state);
+    }
 }
 
 fn render_response_headers(frame: &mut Frame, response: &HttpResponse, area: Rect) {
@@ -839,7 +877,7 @@ fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         "Enter: Send │ Tab: Edit request │ m: Method │ Esc: Response │ Ctrl+R: Send │ ?: Help"
             .to_string()
     } else if app.focus == FocusedPane::ResponseBody {
-        "j/k: Scroll │ 1-5: Request tabs │ F1-F4: Response tabs │ i/Enter: URL bar │ Shift+Tab: Send btn │ ?: Help".to_string()
+        "j/k PgUp/Dn g/G: Scroll │ F1-F4: Tabs │ i: URL │ Shift+Tab: Send │ ?: Help".to_string()
     } else if app.focus == FocusedPane::Sidebar && app.sidebar_section == 0 {
         "j/k: Navigate │ Enter/l: Expand/Load │ h: Collapse │ 2: History │ /: Search │ Tab: History"
             .to_string()
@@ -886,6 +924,10 @@ fn render_help_overlay(frame: &mut Frame, area: Rect) {
         ("F1-F4", "Switch response tabs (F4=Tests)"),
         ("Ctrl+T", "Run test script"),
         ("j/k or ↑/↓", "Scroll / navigate"),
+        ("PageUp / PageDown", "Scroll response by a page"),
+        ("Ctrl+U / Ctrl+D", "Scroll response by half a page"),
+        ("Ctrl+F / End", "Page forward / jump to bottom"),
+        ("Home", "Jump to top of response"),
         ("a", "Add key-value row (in editor)"),
         ("d", "Delete key-value row"),
         ("Space", "Toggle row enabled/disabled"),

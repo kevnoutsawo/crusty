@@ -1,6 +1,7 @@
 //! Crusty TUI — Terminal UI frontend for the Crusty HTTP client.
 
 mod app;
+mod response_scroll;
 mod ui;
 
 use app::{App, AuthType, FocusedPane, KvEditMode, RequestTab, ResponseTab, SidebarItem};
@@ -292,14 +293,38 @@ fn handle_send_button(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
 }
 
 fn handle_response(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
+    let viewport = app.body_viewport_height.get();
+    let content = app.body_content_height.get();
+    let max = response_scroll::max_scroll(content, viewport);
+    let page = response_scroll::page_size(viewport);
+    let half = response_scroll::half_page_size(viewport);
+    let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+
     match key.code {
         KeyCode::Char('j') | KeyCode::Down => {
-            app.response_scroll = app.response_scroll.saturating_add(1);
+            app.response_scroll = app.response_scroll.saturating_add(1).min(max);
         }
         KeyCode::Char('k') | KeyCode::Up => {
             app.response_scroll = app.response_scroll.saturating_sub(1);
         }
-        KeyCode::Char('G') => app.response_scroll = u16::MAX,
+        KeyCode::PageDown => {
+            app.response_scroll = app.response_scroll.saturating_add(page).min(max);
+        }
+        KeyCode::PageUp => {
+            app.response_scroll = app.response_scroll.saturating_sub(page);
+        }
+        KeyCode::Char('f') if ctrl => {
+            app.response_scroll = app.response_scroll.saturating_add(page).min(max);
+        }
+        KeyCode::Char('d') if ctrl => {
+            app.response_scroll = app.response_scroll.saturating_add(half).min(max);
+        }
+        KeyCode::Char('u') if ctrl => {
+            app.response_scroll = app.response_scroll.saturating_sub(half);
+        }
+        KeyCode::Home => app.response_scroll = 0,
+        KeyCode::End => app.response_scroll = max,
+        KeyCode::Char('G') => app.response_scroll = max,
         KeyCode::Char('g') => app.response_scroll = 0,
         KeyCode::Char('q') => return false,
         KeyCode::Char('m') => open_method_selector(app),
