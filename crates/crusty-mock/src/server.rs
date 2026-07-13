@@ -117,7 +117,7 @@ impl MockServer {
     pub fn add_endpoint(&self, endpoint: MockEndpoint) {
         if let Ok(mut eps) = self.endpoints.write() {
             eps.push(endpoint);
-            eps.sort_by(|a, b| b.priority.cmp(&a.priority));
+            eps.sort_by_key(|b| std::cmp::Reverse(b.priority));
         }
     }
 
