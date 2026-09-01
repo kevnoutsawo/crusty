@@ -1,8 +1,9 @@
 [advisories]
 version = 2
 ignore = [
-    # paste is unmaintained but is a transitive dep (via rhai) with no alternative yet
-    "RUSTSEC-2024-0436",
+    # smartstring is unmaintained but is a transitive dep (via rhai's `std` feature)
+    # with no upgrade available. Unmaintained-only advisory, no known vulnerability.
+    "RUSTSEC-2026-0249",
 ]
 
 [licenses]

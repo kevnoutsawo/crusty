@@ -321,12 +321,10 @@ fn handle_response(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
         KeyCode::F(3) => app.response_tab = ResponseTab::Timing,
         KeyCode::F(4) => app.response_tab = ResponseTab::Tests,
         KeyCode::Char('i') | KeyCode::Enter => app.focus = FocusedPane::UrlBar,
-        KeyCode::Char('b') => {
+        KeyCode::Char('b') if app.request_tab == RequestTab::Body => {
             // Quick-enter body editing from response pane
-            if app.request_tab == RequestTab::Body {
-                app.body_editing = true;
-                app.body_cursor = app.body_input.len();
-            }
+            app.body_editing = true;
+            app.body_cursor = app.body_input.len();
         }
         _ => {}
     }
@@ -431,24 +429,22 @@ fn handle_sidebar(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
                 app.focus = FocusedPane::UrlBar;
             }
         }
-        KeyCode::Char('h') => {
-            if app.sidebar_section == 0 {
-                let items = app.sidebar_items();
-                if let Some(item) = items.get(app.sidebar_selected) {
-                    match item {
-                        SidebarItem::Collection { index, .. } => {
-                            let idx = *index;
-                            if idx < app.sidebar_expanded.len() {
-                                app.sidebar_expanded[idx] = false;
-                            }
+        KeyCode::Char('h') if app.sidebar_section == 0 => {
+            let items = app.sidebar_items();
+            if let Some(item) = items.get(app.sidebar_selected) {
+                match item {
+                    SidebarItem::Collection { index, .. } => {
+                        let idx = *index;
+                        if idx < app.sidebar_expanded.len() {
+                            app.sidebar_expanded[idx] = false;
                         }
-                        SidebarItem::Request {
-                            collection_index, ..
-                        } => {
-                            let ci = *collection_index;
-                            if ci < app.sidebar_expanded.len() {
-                                app.sidebar_expanded[ci] = false;
-                            }
+                    }
+                    SidebarItem::Request {
+                        collection_index, ..
+                    } => {
+                        let ci = *collection_index;
+                        if ci < app.sidebar_expanded.len() {
+                            app.sidebar_expanded[ci] = false;
                         }
                     }
                 }
