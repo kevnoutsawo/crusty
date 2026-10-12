@@ -3,6 +3,8 @@ version = 2
 ignore = [
     # paste is unmaintained but is a transitive dep (via rhai) with no alternative yet
     "RUSTSEC-2024-0436",
+    # smartstring is unmaintained; transitive dep via rhai, no safe upgrade available
+    "RUSTSEC-2026-0249",
 ]
 
 [licenses]
