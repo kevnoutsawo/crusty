@@ -7,6 +7,7 @@ use crusty_core::request::{HttpMethod, KeyValue, RequestBody, RequestDefinition}
 use crusty_core::response::HttpResponse;
 use crusty_http::HttpClient;
 use crusty_store::Store;
+use std::cell::Cell;
 use std::collections::HashMap;
 
 /// Which pane is currently focused.
@@ -198,6 +199,14 @@ pub struct App {
     pub error: Option<String>,
     /// Response body scroll offset.
     pub response_scroll: u16,
+    /// Visible row count of the response body viewport, recorded during
+    /// the most recent render. Used by key handlers to clamp scrolling and
+    /// size page jumps.
+    pub body_viewport_height: Cell<u16>,
+    /// Wrapped row count of the response body's text, recorded during
+    /// the most recent render. Together with `body_viewport_height` this
+    /// gives the maximum valid scroll offset.
+    pub body_content_height: Cell<u16>,
 
     // --- Infrastructure ---
     /// HTTP client.
@@ -323,6 +332,8 @@ impl App {
             loading: false,
             error: None,
             response_scroll: 0,
+            body_viewport_height: Cell::new(0),
+            body_content_height: Cell::new(0),
             http_client: HttpClient::default(),
             store,
             collections: Vec::new(),
