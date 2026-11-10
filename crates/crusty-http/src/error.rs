@@ -125,7 +125,14 @@ fn error_chain(err: &(dyn std::error::Error + 'static)) -> String {
     let mut parts: Vec<String> = Vec::new();
     let mut current: Option<&(dyn std::error::Error + 'static)> = Some(err);
     while let Some(e) = current {
-        let s = e.to_string();
+        // Errors from the browser carry a JS stack trace after the first line.
+        let s = e
+            .to_string()
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .trim()
+            .to_string();
         if !s.is_empty() && !parts.iter().any(|p| p == &s) {
             parts.push(s);
         }
@@ -236,5 +243,19 @@ mod tests {
 
         let e = Outer(Inner);
         assert_eq!(error_chain(&e), "outer failure → inner failure");
+    }
+
+    #[test]
+    fn error_chain_keeps_only_the_first_line_of_each_message() {
+        #[derive(Debug)]
+        struct WithStack;
+        impl std::fmt::Display for WithStack {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "TypeError: Failed to fetch\n    at foo (app.js:1:2)")
+            }
+        }
+        impl std::error::Error for WithStack {}
+
+        assert_eq!(error_chain(&WithStack), "TypeError: Failed to fetch");
     }
 }

@@ -59,28 +59,23 @@ pub fn to_definition(req: &WebRequest) -> Result<RequestDefinition, String> {
     let mut def = RequestDefinition::new("Web request", url);
     def.method = parse_method(&req.method)?;
 
-    let mut content_type = None;
-    for h in &req.headers {
-        let key = h.key.trim();
-        if key.is_empty() {
-            continue;
-        }
-        // The resolver sets Content-Type from the body type; sending the header
-        // as well would duplicate it.
-        if key.eq_ignore_ascii_case("content-type") {
-            if h.enabled {
-                content_type = Some(h.value.trim().to_string());
-            }
-            continue;
-        }
-        def.headers.push(KeyValue {
-            key: key.to_string(),
+    def.headers = req
+        .headers
+        .iter()
+        .filter(|h| !h.key.trim().is_empty())
+        .map(|h| KeyValue {
+            key: h.key.trim().to_string(),
             value: h.value.clone(),
             enabled: h.enabled,
-        });
-    }
+        })
+        .collect();
 
     if !req.body.trim().is_empty() {
+        let content_type = def
+            .headers
+            .iter()
+            .find(|h| h.enabled && is_content_type(&h.key))
+            .map(|h| h.value.trim().to_string());
         let is_json = serde_json::from_str::<serde_json::Value>(&req.body).is_ok();
         let declared_json = content_type.as_deref().is_none_or(|ct| ct.contains("json"));
         def.body = if is_json && declared_json {
@@ -91,11 +86,39 @@ pub fn to_definition(req: &WebRequest) -> Result<RequestDefinition, String> {
                 content_type: content_type.unwrap_or_else(|| "text/plain".to_string()),
             }
         };
-    } else if let Some(ct) = content_type {
-        def.headers.push(KeyValue::new("Content-Type", ct));
     }
 
     Ok(def)
+}
+
+/// The resolver sets Content-Type from the body type, so a Content-Type header
+/// would be sent twice. Code generation needs the header, so this runs only
+/// before sending.
+pub fn for_sending(mut def: RequestDefinition) -> RequestDefinition {
+    if !matches!(def.body, RequestBody::None) {
+        def.headers.retain(|h| !is_content_type(&h.key));
+    }
+    def
+}
+
+fn is_content_type(key: &str) -> bool {
+    key.trim().eq_ignore_ascii_case("content-type")
+}
+
+/// `fetch` throws on these before any request is made, with a message that
+/// doesn't say how to fix it. Code generation still accepts them.
+pub fn check_browser_can_send(def: &RequestDefinition) -> Result<(), String> {
+    let has_body = !matches!(def.body, RequestBody::None);
+    if has_body && matches!(def.method, HttpMethod::Get | HttpMethod::Head) {
+        return Err(format!(
+            "Browsers can't send a body with a {} request. Clear the body or choose another method.",
+            def.method
+        ));
+    }
+    if matches!(def.method, HttpMethod::Trace | HttpMethod::Connect) {
+        return Err(format!("Browsers don't allow {} requests.", def.method));
+    }
+    Ok(())
 }
 
 pub fn from_definition(def: &RequestDefinition) -> WebRequest {
@@ -270,16 +293,39 @@ mod tests {
     }
 
     #[test]
-    fn content_type_header_moves_into_the_body() {
+    fn content_type_header_sets_the_body_type_and_is_kept() {
         let mut req = request("POST", "https://example.com");
         req.headers = vec![header("content-type", "application/xml")];
         req.body = "<a/>".into();
         let def = to_definition(&req).unwrap();
-        assert!(def.headers.is_empty(), "Content-Type would be sent twice");
+        assert_eq!(def.headers.len(), 1, "code generation needs the header");
         match def.body {
             RequestBody::Raw { content_type, .. } => assert_eq!(content_type, "application/xml"),
             other => panic!("expected raw body, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn content_type_is_dropped_for_sending_when_the_body_sets_it() {
+        let mut req = request("POST", "https://example.com");
+        req.headers = vec![
+            header("Content-Type", "application/json"),
+            header("Accept", "*/*"),
+        ];
+        req.body = "{}".into();
+        let def = for_sending(to_definition(&req).unwrap());
+        let keys: Vec<_> = def.headers.iter().map(|h| h.key.as_str()).collect();
+        assert_eq!(keys, ["Accept"]);
+    }
+
+    #[test]
+    fn generated_code_keeps_the_content_type() {
+        let mut req = request("POST", "https://example.com");
+        req.headers = vec![header("Content-Type", "application/json")];
+        req.body = r#"{"a":1}"#.into();
+        let code =
+            crusty_export::codegen::generate(&to_definition(&req).unwrap(), Language::Python);
+        assert!(code.contains("Content-Type"), "{code}");
     }
 
     #[test]
@@ -294,11 +340,36 @@ mod tests {
     }
 
     #[test]
-    fn content_type_without_body_is_kept_as_header() {
+    fn content_type_without_body_is_still_sent() {
         let mut req = request("GET", "https://example.com");
         req.headers = vec![header("Content-Type", "application/json")];
-        let def = to_definition(&req).unwrap();
+        let def = for_sending(to_definition(&req).unwrap());
         assert_eq!(def.headers.len(), 1);
+    }
+
+    #[test]
+    fn browser_rejects_get_or_head_with_a_body() {
+        for method in ["GET", "HEAD"] {
+            let mut req = request(method, "https://example.com");
+            req.body = "{}".into();
+            let err = check_browser_can_send(&to_definition(&req).unwrap()).unwrap_err();
+            assert!(err.contains(method), "{err}");
+        }
+    }
+
+    #[test]
+    fn browser_accepts_get_without_body_and_post_with_one() {
+        let get = request("GET", "https://example.com");
+        assert!(check_browser_can_send(&to_definition(&get).unwrap()).is_ok());
+        let mut post = request("POST", "https://example.com");
+        post.body = "{}".into();
+        assert!(check_browser_can_send(&to_definition(&post).unwrap()).is_ok());
+    }
+
+    #[test]
+    fn browser_rejects_trace() {
+        let req = request("TRACE", "https://example.com");
+        assert!(check_browser_can_send(&to_definition(&req).unwrap()).is_err());
     }
 
     #[test]

@@ -14,7 +14,8 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen(js_name = sendRequest)]
 pub async fn send_request(request: JsValue) -> Result<JsValue, JsValue> {
     let request: dto::WebRequest = from_js(request)?;
-    let def = dto::to_definition(&request).map_err(fail)?;
+    let def = dto::for_sending(dto::to_definition(&request).map_err(fail)?);
+    dto::check_browser_can_send(&def).map_err(fail)?;
     let resolved = crusty_core::orchestrator::resolve_request(&def, &[], &HashMap::new())
         .map_err(|e| fail(e.to_string()))?;
     let client = HttpClient::new().map_err(|e| fail(e.user_message()))?;
