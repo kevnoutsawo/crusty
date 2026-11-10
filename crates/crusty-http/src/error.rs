@@ -46,6 +46,16 @@ fn network_message(err: &reqwest::Error) -> String {
     if err.is_timeout() {
         return "Connection timed out. Check the URL and your network.".to_string();
     }
+    // In the browser, fetch reports every network-level failure the same way and
+    // hides the cause, so the likely reasons are spelled out instead.
+    #[cfg(target_family = "wasm")]
+    if err.is_request() {
+        return format!(
+            "The browser couldn't complete the request. The server may be unreachable, \
+             or it doesn't allow requests from this page (CORS). ({chain})"
+        );
+    }
+    #[cfg(not(target_family = "wasm"))]
     if err.is_connect() {
         return match classify_connect_error(&chain) {
             Some(ConnectKind::Dns) => {
@@ -70,6 +80,7 @@ fn network_message(err: &reqwest::Error) -> String {
     format!("Network error: {chain}")
 }
 
+#[cfg_attr(target_family = "wasm", allow(dead_code))]
 #[derive(Debug, PartialEq, Eq)]
 enum ConnectKind {
     Dns,
@@ -78,6 +89,7 @@ enum ConnectKind {
     Tls,
 }
 
+#[cfg_attr(target_family = "wasm", allow(dead_code))]
 fn classify_connect_error(chain: &str) -> Option<ConnectKind> {
     let lower = chain.to_lowercase();
     // DNS variants across platforms

@@ -4,7 +4,8 @@ use crate::error::HttpError;
 use crusty_core::request::{ResolvedBody, ResolvedRequest};
 use crusty_core::response::{HttpResponse, ResponseSize, ResponseTiming};
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use web_time::Instant;
 
 /// The HTTP client that executes resolved requests.
 pub struct HttpClient {

@@ -1,0 +1,25 @@
+[package]
+name = "crusty-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "WebAssembly bindings that expose Crusty's core to the web client"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+crusty-core = { path = "../crusty-core" }
+crusty-http = { path = "../crusty-http" }
+crusty-export = { path = "../crusty-export" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+url = { workspace = true }
+# Pinned to the version web/scripts/build-wasm.sh runs `wasm-bindgen` at; the
+# CLI refuses to process output from a different version.
+wasm-bindgen = "=0.2.114"
+wasm-bindgen-futures = "0.4"
+serde-wasm-bindgen = "0.6"
+
+[lints]
+workspace = true

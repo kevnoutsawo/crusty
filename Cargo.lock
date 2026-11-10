@@ -488,8 +488,8 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
- "tokio",
  "url",
+ "web-time",
 ]
 
 [[package]]
@@ -610,6 +610,21 @@ dependencies = [
  "unicode-width 0.2.0",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "crusty-wasm"
+version = "0.1.0"
+dependencies = [
+ "crusty-core",
+ "crusty-export",
+ "crusty-http",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "url",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -758,7 +773,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1934,7 +1949,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2281,7 +2296,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2351,6 +2366,17 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]

@@ -16,5 +16,9 @@ http = { workspace = true }
 regex = { workspace = true }
 base64 = { workspace = true }
 
+# The browser has no OS random source; take it from the Web Crypto API instead.
+[target.'cfg(target_family = "wasm")'.dependencies]
+uuid = { workspace = true, features = ["js"] }
+
 [lints]
 workspace = true

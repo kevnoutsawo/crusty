@@ -12,6 +12,7 @@ members = [
     "crates/crusty-proxy",
     "crates/crusty-mock",
     "crates/crusty-tui",
+    "crates/crusty-wasm",
 ]
 
 [workspace.package]
