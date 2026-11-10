@@ -1,0 +1,32 @@
+[package]
+name = "crusty-gpui"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Spike: native GPUI desktop frontend for Crusty"
+
+# Its own workspace, so the main workspace's `cargo clippy/test --workspace` in CI
+# never builds GPUI or needs its X11/Wayland system packages.
+[workspace]
+
+[dependencies]
+crusty-core = { path = "../../crates/crusty-core" }
+crusty-http = { path = "../../crates/crusty-http" }
+# Pinned exactly: gpui is pre-1.0 and breaks API between releases. Same pin as
+# gpui-todo's desktop build. Linux builds need libxkbcommon-x11-dev and libx11-xcb-dev.
+gpui = "=0.2.2"
+# reqwest needs a Tokio runtime; GPUI's executor is not one, so requests run on
+# a small runtime of their own and the UI awaits the JoinHandle.
+tokio = { version = "1", features = ["rt-multi-thread"] }
+unicode-segmentation = "1"
+# Capped for the same reason as gpui-todo: libc 0.2.190 dropped `ENOATTR`,
+# which breaks xattr 0.2.3 (pulled in by gpui's http client).
+libc = ">=0.2.178, <0.2.190"
+env_logger = "0.11"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
