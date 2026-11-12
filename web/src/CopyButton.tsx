@@ -1,4 +1,6 @@
+import { CheckIcon, CopyIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 export function CopyButton({ text, label }: { text: string; label: string }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
@@ -16,10 +18,11 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
     )
 
   return (
-    <button type="button" className="button small" onClick={copy} disabled={!text}>
+    <Button variant="outline" size="xs" onClick={copy} disabled={!text}>
+      {state === 'copied' ? <CheckIcon data-icon="inline-start" /> : <CopyIcon data-icon="inline-start" />}
       <span aria-live="polite">
         {state === 'copied' ? 'Copied' : state === 'failed' ? "Couldn't copy" : label}
       </span>
-    </button>
+    </Button>
   )
 }

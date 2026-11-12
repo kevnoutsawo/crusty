@@ -125,20 +125,27 @@ fn error_chain(err: &(dyn std::error::Error + 'static)) -> String {
     let mut parts: Vec<String> = Vec::new();
     let mut current: Option<&(dyn std::error::Error + 'static)> = Some(err);
     while let Some(e) = current {
-        // Errors from the browser carry a JS stack trace after the first line.
-        let s = e
-            .to_string()
-            .lines()
-            .next()
-            .unwrap_or_default()
-            .trim()
-            .to_string();
+        // Errors from the browser arrive as `JsValue(TypeError: …` followed by a
+        // JS stack trace; keep just the browser's message.
+        let s = browser_message(&e.to_string());
         if !s.is_empty() && !parts.iter().any(|p| p == &s) {
             parts.push(s);
         }
         current = e.source();
     }
     parts.join(" → ")
+}
+
+fn browser_message(text: &str) -> String {
+    let first = text.lines().next().unwrap_or_default().trim();
+    match first.strip_prefix("JsValue(") {
+        // With no stack trace, the wrapper's closing parenthesis ends the line.
+        Some(inner) if !text.trim().contains('\n') => {
+            inner.strip_suffix(')').unwrap_or(inner).to_string()
+        }
+        Some(inner) => inner.to_string(),
+        None => first.to_string(),
+    }
 }
 
 #[cfg(test)]
@@ -257,5 +264,23 @@ mod tests {
         impl std::error::Error for WithStack {}
 
         assert_eq!(error_chain(&WithStack), "TypeError: Failed to fetch");
+    }
+
+    #[test]
+    fn browser_message_unwraps_jsvalue() {
+        assert_eq!(
+            browser_message("JsValue(TypeError: Failed to fetch)"),
+            "TypeError: Failed to fetch"
+        );
+        assert_eq!(
+            browser_message(
+                "JsValue(TypeError: Failed to fetch\nTypeError: x\n    at f (a.js:1:2))"
+            ),
+            "TypeError: Failed to fetch"
+        );
+        assert_eq!(
+            browser_message("tcp connect error (os error 111)"),
+            "tcp connect error (os error 111)"
+        );
     }
 }

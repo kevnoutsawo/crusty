@@ -19,6 +19,12 @@ vi.mock('./core', async () => {
 
 const mocked = vi.mocked(core)
 
+// Base UI's Select is a combobox with a popup listbox, not a native <select>.
+async function choose(user: ReturnType<typeof userEvent.setup>, name: string, option: string) {
+  await user.click(screen.getByRole('combobox', { name }))
+  await user.click(await screen.findByRole('option', { name: option }))
+}
+
 const okResponse: core.WebResponse = {
   status: 200,
   statusText: 'OK',
@@ -43,7 +49,7 @@ describe('App', () => {
     mocked.sendRequest.mockResolvedValue(okResponse)
     render(<App />)
 
-    await user.selectOptions(screen.getByLabelText('Method'), 'POST')
+    await choose(user, 'Method', 'POST')
     await user.type(screen.getByLabelText('Header 1 name'), 'Accept')
     await user.type(screen.getByLabelText('Header 1 value'), 'application/json')
     await user.type(screen.getByLabelText('URL'), 'https://api.example.com/users{Enter}')
@@ -83,7 +89,7 @@ describe('App', () => {
     await user.type(screen.getByLabelText('Request body'), 'hello')
     expect(screen.getByText(/Browsers can't send a body with GET/)).toBeInTheDocument()
 
-    await user.selectOptions(screen.getByLabelText('Method'), 'POST')
+    await choose(user, 'Method', 'POST')
     expect(screen.queryByText(/Browsers can't send a body/)).not.toBeInTheDocument()
   })
 
@@ -114,7 +120,7 @@ describe('App', () => {
 
     expect(mocked.importCurl).toHaveBeenCalledWith('curl -X PUT …')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Method')).toHaveValue('PUT')
+    expect(screen.getByRole('combobox', { name: 'Method' })).toHaveTextContent('PUT')
     expect(screen.getByLabelText('URL')).toHaveValue('https://api.example.com/users/1')
     expect(screen.getByRole('tab', { name: 'Body' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByLabelText('Request body')).toHaveValue('{"name":"Bob"}')
@@ -143,8 +149,7 @@ describe('App', () => {
     const dialog = screen.getByRole('dialog', { name: 'Generate code' })
 
     expect(await within(dialog).findByText('code for curl')).toBeInTheDocument()
-    await within(dialog).findByRole('option', { name: 'Python (requests)' })
-    await user.selectOptions(within(dialog).getByLabelText('Language'), 'python')
+    await choose(user, 'Language', 'Python (requests)')
     expect(await within(dialog).findByText('code for python')).toBeInTheDocument()
     expect(mocked.generateCode).toHaveBeenLastCalledWith(
       expect.objectContaining({ url: 'https://api.example.com' }),
